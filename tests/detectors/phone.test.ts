@@ -86,3 +86,13 @@ test('resolves overlapping matches by picking the longer one', (t) => {
   t.is(findings[0]?.value, '+1-23-4-567');
   t.is(findings[1]?.value, '567-890-1234');
 });
+
+test('span accurately reflects value slice in text', (t) => {
+  const text = 'Call me at +1-555-123-4567 or (555) 123-4567 anytime.';
+  const findings = detector.detect(text);
+  for (const finding of findings) {
+    const [start, end] = finding.span;
+    t.is(text.slice(start, end), finding.value);
+  }
+});
+

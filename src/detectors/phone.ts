@@ -26,9 +26,11 @@ export class PhoneDetector implements Detector {
         const digits = value.replace(/\D/g, '');
         if (digits.length < 7) continue;
 
+        const start = match.index + (match[0].length - value.length);
+
         raw.push({
           category: 'Phone',
-          span: [match.index, match.index + value.length],
+          span: [start, start + value.length],
           value,
           placeholderPrefix: 'Phone',
         });
