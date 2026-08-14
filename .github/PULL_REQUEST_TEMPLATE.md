@@ -14,6 +14,7 @@ Please describe how you tested this change.
 - Manual verification steps?
 
 ## Checklist
+- [ ] If this was for an open issue, I was assigned to it
 - [ ] I have self-reviewed my code.
 - [ ] I have formatted, linted, and passed all tests (`pnpm run check`).
 - [ ] I have added/updated documentation if necessary.
