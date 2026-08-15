@@ -1,3 +1,18 @@
+# Unreleased
+
+## Added
+
+- **Watch mode** — `watch` command for real-time clipboard/file monitoring with automatic scrubbing
+  - `prompt-scrub watch --clipboard` — monitors clipboard, scrubs data, sends notifications
+  - `prompt-scrub watch --file <files...>` — monitors and scrubs files in place
+  - Cross-platform: Windows/macOS/Linux
+  - Options: `--interval`, `--once`, `--session-id`, `--disable`, `--enable`, `--url-allowlist`
+
+## Fixed
+
+- **TypeScript compatibility** — Fixed type handling for `ScrubResult.scrubbedContent`
+- **Windows build** — Cross-platform build script
+
 # 1.0.2
 
 Patch release — dev-dependency and CI maintenance only. No public-API or runtime changes.

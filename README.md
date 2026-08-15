@@ -49,6 +49,16 @@ Or install as a dependency in your Node.js project:
 npm install @nanocollective/prompt-scrub
 ```
 
+### Optional: Initialize Configuration
+
+Create a global configuration file for rule packs and URL allowlists:
+
+```bash
+prompt-scrub config init
+```
+
+See the [CLI Reference](docs/getting-started/cli.md#configuration-management) for details on managing your configuration.
+
 ### Recommended: Inspect first
 
 Before scrubbing, run `inspect` on a real prompt to review what the tool detected before sending your prompt:
@@ -76,6 +86,15 @@ The hash is deterministic — the same prompt always produces the same hash, so 
 ```bash
 echo "My email is user@example.com" | prompt-scrub scrub
 # Output: My email is Email_1
+```
+
+**CLI: Watch clipboard**
+```bash
+# Monitor clipboard and automatically scrub sensitive data
+prompt-scrub watch --clipboard
+
+# Watch a file
+prompt-scrub watch --file prompt.txt --once
 ```
 
 **Node.js API: Scrubbing and Rehydrating**
