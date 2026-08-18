@@ -49,16 +49,6 @@ Or install as a dependency in your Node.js project:
 npm install @nanocollective/prompt-scrub
 ```
 
-### Optional: Initialize Configuration
-
-Create a global configuration file for rule packs and URL allowlists:
-
-```bash
-prompt-scrub config init
-```
-
-See the [CLI Reference](docs/getting-started/cli.md#configuration-management) for details on managing your configuration.
-
 ### Recommended: Inspect first
 
 Before scrubbing, run `inspect` on a real prompt to review what the tool detected before sending your prompt:
@@ -95,7 +85,12 @@ prompt-scrub watch --clipboard
 
 # Watch a file
 prompt-scrub watch --file prompt.txt --once
+
+# Preview changes without writing anything
+prompt-scrub watch --file prompt.txt --dry-run --once
 ```
+
+See the [CLI Reference](docs/getting-started/cli.md#watch-mode) for all watch options and platform requirements.
 
 **Node.js API: Scrubbing and Rehydrating**
 ```typescript

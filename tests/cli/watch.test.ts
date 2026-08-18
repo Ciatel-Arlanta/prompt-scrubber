@@ -3,8 +3,14 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'ava';
 import {
+  assertClipboardSupport,
+  clipboardTool,
   formatNotificationMessage,
   handleWatch,
+  isCommandAvailable,
+  notificationTool,
+  resetNotificationWarning,
+  sendNotification,
   watchClipboardStep,
   watchFileStep,
 } from '../../src/cli/commands/watch.js';
@@ -138,4 +144,148 @@ test('handleWatch throws when neither --clipboard nor --file is provided', async
     },
     { message: 'Must specify --clipboard or --file <file>' },
   );
+});
+
+test('isCommandAvailable detects present and absent binaries', (t) => {
+  t.true(isCommandAvailable(process.platform === 'win32' ? 'where.exe' : 'sh'));
+  t.false(isCommandAvailable('prompt-scrub-definitely-not-a-real-binary'));
+});
+
+test('clipboardTool and notificationTool resolve a binary for this platform', (t) => {
+  t.true(clipboardTool().length > 0);
+  t.true(notificationTool().length > 0);
+});
+
+test('assertClipboardSupport passes when the platform clipboard tool exists', (t) => {
+  if (isCommandAvailable(clipboardTool())) {
+    t.notThrows(() => assertClipboardSupport());
+  } else {
+    t.throws(() => assertClipboardSupport(), { message: /was not found on your PATH/ });
+  }
+});
+
+test('sendNotification warns once instead of silently failing when the tool is missing', (t) => {
+  resetNotificationWarning();
+  const warnings: string[] = [];
+  const collect = (msg: string) => {
+    warnings.push(msg);
+  };
+
+  if (isCommandAvailable(notificationTool())) {
+    t.pass('notifier present on this machine; missing-tool path covered on CI runners without it');
+    return;
+  }
+
+  sendNotification('prompt-scrub', 'Scrubbed 1 email', collect);
+  sendNotification('prompt-scrub', 'Scrubbed 1 email', collect);
+
+  t.is(warnings.length, 1);
+  t.true(warnings[0]?.includes('Desktop notifications disabled'));
+});
+
+test('sendNotification does not execute shell metacharacters in the message', (t) => {
+  resetNotificationWarning();
+  const marker = path.join(tmpDir, 'pwned.txt');
+  const posixMarker = marker.split(path.sep).join('/');
+  // Mixes command substitution, backticks and a bare apostrophe - the three
+  // things that broke the old execSync string interpolation.
+  const injected = [
+    'Scrubbed 1 secret in',
+    `$(node -e "require('fs').writeFileSync('${posixMarker}','x')")`,
+    `\`node -e "require('fs').writeFileSync('${posixMarker}','x')"\``,
+    "it's.txt",
+  ].join(' ');
+
+  t.notThrows(() => sendNotification('prompt-scrub', injected, () => {}));
+  t.false(fs.existsSync(marker), 'command substitution in the message must not run');
+});
+
+test('watchFileStep with dryRun reports without writing the file', async (t) => {
+  const filePath = path.join(tmpDir, 'dry-run.txt');
+  const original = 'Contact user@example.com immediately';
+  fs.writeFileSync(filePath, original, 'utf8');
+
+  const logs: string[] = [];
+  let notified = false;
+
+  const next = await watchFileStep(filePath, '', {
+    dryRun: true,
+    logFn: (msg) => {
+      logs.push(msg);
+    },
+    notifyFn: () => {
+      notified = true;
+    },
+  });
+
+  t.is(fs.readFileSync(filePath, 'utf8'), original, 'file must be left untouched');
+  t.is(next, original);
+  t.false(notified, 'dry-run must not fire a notification');
+  t.true(logs.some((l) => l.includes('(dry-run)')));
+});
+
+test('watchClipboardStep with dryRun reports without writing the clipboard', async (t) => {
+  let writeCalled = false;
+  const logs: string[] = [];
+
+  const next = await watchClipboardStep('', {
+    dryRun: true,
+    readClipboardFn: () => 'Contact user@example.com immediately',
+    writeClipboardFn: () => {
+      writeCalled = true;
+    },
+    logFn: (msg) => {
+      logs.push(msg);
+    },
+    notifyFn: () => {},
+  });
+
+  t.false(writeCalled, 'dry-run must not write the clipboard');
+  t.is(next, 'Contact user@example.com immediately');
+  t.true(logs.some((l) => l.includes('(dry-run)')));
+});
+
+test('watchFileStep with backup writes <file>.bak holding the original content', async (t) => {
+  const filePath = path.join(tmpDir, 'backup-me.txt');
+  const original = 'Contact user@example.com immediately';
+  fs.writeFileSync(filePath, original, 'utf8');
+
+  await watchFileStep(filePath, '', {
+    backup: true,
+    logFn: () => {},
+    notifyFn: () => {},
+  });
+
+  t.is(fs.readFileSync(filePath, 'utf8'), 'Contact «Email_1» immediately');
+  t.true(fs.existsSync(`${filePath}.bak`));
+  t.is(fs.readFileSync(`${filePath}.bak`, 'utf8'), original, 'backup keeps pre-scrub content');
+});
+
+test('handleWatch registers a SIGINT handler that clears the timer and stops', async (t) => {
+  const filePath = path.join(tmpDir, 'sigint.txt');
+  fs.writeFileSync(filePath, 'nothing sensitive here', 'utf8');
+
+  const before = process.listenerCount('SIGINT');
+  let stopped = false;
+
+  const timer = await handleWatch({
+    file: filePath,
+    interval: '50',
+    logFn: () => {},
+    notifyFn: () => {},
+    onStop: () => {
+      stopped = true;
+    },
+  });
+
+  t.is(process.listenerCount('SIGINT'), before + 1, 'SIGINT handler is registered');
+
+  process.emit('SIGINT');
+
+  t.true(stopped, 'SIGINT invokes the stop path');
+  t.is(process.listenerCount('SIGINT'), before, 'handler is removed again on stop');
+
+  if (timer) {
+    clearInterval(timer);
+  }
 });

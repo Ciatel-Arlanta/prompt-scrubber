@@ -33,6 +33,50 @@ Reads a message from `stdin` or a file and prints a human-readable diff of the t
 - `--disable <detectors>`: Comma-separated list of detectors to disable.
 - `--hash`: Print *only* the SHA-256 hash for scripting purposes.
 
+## Watch Mode
+
+### `prompt-scrub watch`
+Continuously monitors your system clipboard and/or one or more files, scrubbing sensitive content in place as soon as it appears. This is aimed at the copy-paste workflow: copy a prompt containing real data, and it is scrubbed before you paste it into a web-based LLM.
+
+At least one of `--clipboard` or `--file` is required. A desktop notification is emitted for each scrub, summarising what was replaced.
+
+```bash
+# Scrub the clipboard continuously
+prompt-scrub watch --clipboard
+
+# Scrub two files, checking twice a second
+prompt-scrub watch --file prompt.txt notes.md --interval 500
+
+# See what would change without writing anything
+prompt-scrub watch --file prompt.txt --dry-run --once
+```
+
+Press `Ctrl-C` to stop watching; the poll loop is cleared and the process exits cleanly.
+
+**Options:**
+- `-c, --clipboard`: Monitor the system clipboard.
+- `-f, --file <files...>`: One or more files to monitor and rewrite in place.
+- `-i, --interval <ms>`: Polling interval in milliseconds (default `1000`).
+- `--once`: Run a single check pass and exit. Useful in scripts and CI.
+- `--dry-run`: Report what would be scrubbed without writing the clipboard or any file.
+- `--backup`: Write `<file>.bak` containing the pre-scrub content before overwriting a watched file.
+- `--session-id <id>`: Reuse an existing session map so placeholders stay stable across runs.
+- `--disable <detectors>`: Comma-separated list of detectors to skip.
+- `--enable <detectors>`: Comma-separated list of off-by-default detectors to enable.
+- `--strict-name`: Enable strict allowlisting for `NameDetector`.
+- `--code-tell-terms <terms>`: Comma-separated list of private identifiers to detect.
+- `--url-allowlist <hosts>`: Comma-separated list of hostnames to pass through.
+
+**Platform requirements:**
+
+Watch mode shells out to a small platform helper for clipboard access and notifications. If the required binary is missing, clipboard monitoring fails immediately with an actionable error, and notifications degrade to a single warning on `stderr` rather than failing silently.
+
+| Platform | Clipboard | Notifications |
+| --- | --- | --- |
+| Windows | `powershell.exe` | `powershell.exe` |
+| macOS | `pbpaste` / `pbcopy` | `osascript` |
+| Linux | `xclip` | `notify-send` (`libnotify-bin`) |
+
 ## Session Management
 
 ### `prompt-scrub sessions list`

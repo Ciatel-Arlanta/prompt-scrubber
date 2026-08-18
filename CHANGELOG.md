@@ -6,7 +6,11 @@
   - `prompt-scrub watch --clipboard` — monitors clipboard, scrubs data, sends notifications
   - `prompt-scrub watch --file <files...>` — monitors and scrubs files in place
   - Cross-platform: Windows/macOS/Linux
-  - Options: `--interval`, `--once`, `--session-id`, `--disable`, `--enable`, `--url-allowlist`
+  - `--dry-run` previews changes without writing; `--backup` keeps a `<file>.bak` before overwriting
+  - `Ctrl-C` (SIGINT/SIGTERM) clears the poll timer and exits cleanly
+  - Missing platform helpers (`xclip`, `notify-send`, `osascript`) are reported with an install hint instead of failing silently
+  - Options: `--interval`, `--once`, `--dry-run`, `--backup`, `--session-id`, `--disable`, `--enable`, `--url-allowlist`
+  - Documented in `docs/getting-started/cli.md`
 
 ## Fixed
 
