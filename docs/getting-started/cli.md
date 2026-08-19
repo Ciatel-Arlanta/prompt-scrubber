@@ -78,8 +78,12 @@ Prints the active configuration as JSON on `stdout`, and the path it was read fr
 $ prompt-scrub config show
 Config file: /home/alice/.config/prompt-scrub/config.json
 {
-  "rulePacks": ["prompt-scrub-projectx"],
-  "urlAllowlist": ["example.com"]
+  "rulePacks": [
+    "prompt-scrub-projectx"
+  ],
+  "urlAllowlist": [
+    "example.com"
+  ]
 }
 ```
 
