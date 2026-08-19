@@ -95,6 +95,23 @@ const { content } = rehydrate({
 console.log(content); // "I see your key is sk-12345"
 ```
 
+## Configuration
+
+`prompt-scrub` reads an optional config file for extra rule packs and URL allowlisting. Create one pre-filled with the default schema:
+
+```bash
+prompt-scrub init
+# Created config file at /home/alice/.config/prompt-scrub/config.json
+```
+
+Print the configuration that is actually active — JSON on `stdout`, the path it came from on `stderr`:
+
+```bash
+prompt-scrub config show
+```
+
+Entries that do not match the schema are reported and exit non-zero, so `config show` doubles as a config check in scripts. See the [CLI reference](docs/getting-started/cli.md#configuration) for the full schema and options.
+
 ## Documentation
 
 Full user guides and architecture details are in the [`docs/`](docs/) directory:
