@@ -41,6 +41,35 @@ test('CLI: scrub reads from stdin and outputs to stdout/stderr', (t) => {
   t.regex(result.stderr, /Session ID: \w+/);
 });
 
+test('CLI: scrub prints an entity summary to stderr', (t) => {
+  const result = runCli(['scrub'], 'Mail alice@example.com about sk-abcdefghijklmnopqrstuvwxyz');
+  t.is(result.status, 0);
+  t.true(result.stderr.includes('Scrubbed: 2 entities (1 Email, 1 Secret)'));
+  t.false(result.stdout.includes('Scrubbed:'));
+});
+
+test('CLI: scrub reports zero entities when nothing is detected', (t) => {
+  const result = runCli(['scrub'], 'nothing sensitive here');
+  t.is(result.status, 0);
+  t.is(result.stdout, 'nothing sensitive here');
+  t.true(result.stderr.includes('Scrubbed: 0 entities'));
+  t.false(result.stderr.includes('Session ID'));
+});
+
+test('CLI: scrub --quiet suppresses the summary but keeps the session ID', (t) => {
+  const result = runCli(['scrub', '--quiet'], 'Contact me at alice@example.com');
+  t.is(result.status, 0);
+  t.is(result.stdout, 'Contact me at «Email_1»');
+  t.false(result.stderr.includes('Scrubbed:'));
+  t.regex(result.stderr, /Session ID: \S+/);
+});
+
+test('CLI: scrub -q is the short form of --quiet', (t) => {
+  const result = runCli(['scrub', '-q'], 'Contact me at alice@example.com');
+  t.is(result.status, 0);
+  t.false(result.stderr.includes('Scrubbed:'));
+});
+
 test('CLI: rehydrate reads from stdin and restores', (t) => {
   // Step 1: scrub
   const scrubRes = runCli(['scrub'], 'Secret: sk-abcdefghijklmnopqrstuvwxyz');

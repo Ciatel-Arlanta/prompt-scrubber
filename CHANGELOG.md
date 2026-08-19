@@ -1,3 +1,12 @@
+# Unreleased
+
+## Added
+
+- **Scrub summary** — `scrub` now prints a one-line summary of what it replaced to `stderr`, e.g. `Scrubbed: 3 entities (1 Email, 2 Secrets)`, so the counts no longer require a separate `inspect` run
+  - `-q, --quiet` suppresses the summary for strict pipeline usage; the `Session ID:` line is unaffected
+  - The summary counts replacements made by that run only — repeats of the same value each count, and reusing a session with `--session-id` does not carry earlier counts over
+  - `scrub()` returns the same data to library callers as `result.stats` (`totalEntities`, `byCategory`), aggregated across every message of a `Message[]` input
+
 # 1.0.2
 
 Patch release — dev-dependency and CI maintenance only. No public-API or runtime changes.

@@ -37,10 +37,16 @@ export interface ScrubOptions {
   urlAllowlist?: string[]; // List of hostnames to pass-through in URLs
 }
 
+export interface ScrubStats {
+  totalEntities: number;
+  byCategory: Record<string, number>;
+}
+
 export interface ScrubResult {
   scrubbedContent: string | Message[];
   sessionId?: string;
   sessionMap?: Record<string, string>;
+  stats: ScrubStats;
 }
 
 export interface RehydrateRequest {
