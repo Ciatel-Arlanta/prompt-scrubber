@@ -66,7 +66,11 @@ export function loadConfig(): PromptScrubConfig {
           if (typeof host === 'string') urlAllowlist.add(host);
         }
       }
-      if (typeof globalData?.sessionTtlDays === 'number' && Number.isFinite(globalData.sessionTtlDays) && globalData.sessionTtlDays > 0) {
+      if (
+        typeof globalData?.sessionTtlDays === 'number' &&
+        Number.isFinite(globalData.sessionTtlDays) &&
+        globalData.sessionTtlDays > 0
+      ) {
         config.sessionTtlDays = globalData.sessionTtlDays;
       }
     } catch (_e) {

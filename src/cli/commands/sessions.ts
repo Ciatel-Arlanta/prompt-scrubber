@@ -1,5 +1,10 @@
 import type { Command } from 'commander';
-import { deleteSessionMap, listSessions, readSessionMap, gcSessions } from '../../session/storage.js';
+import {
+  deleteSessionMap,
+  listSessions,
+  readSessionMap,
+  gcSessions,
+} from '../../session/storage.js';
 import { loadConfig } from '../../core/config.js';
 
 export function setupSessionsCommands(program: Command) {
