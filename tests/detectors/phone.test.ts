@@ -95,4 +95,3 @@ test('span accurately reflects value slice in text', (t) => {
     t.is(text.slice(start, end), finding.value);
   }
 });
-
