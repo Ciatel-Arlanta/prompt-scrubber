@@ -90,12 +90,11 @@ Let's build a rule pack that detects "Project X" codenames.
    ```
 
 4. **Configuration**:
-   Users can then add it to their `package.json` in their project:
+   Users can then add it to their configuration file (`prompt-scrub init` creates one):
    ```json
    {
-     "prompt-scrub": {
-       "rulePacks": ["prompt-scrub-projectx"]
-     }
+     "rulePacks": ["prompt-scrub-projectx"],
+     "urlAllowlist": []
    }
    ```
 

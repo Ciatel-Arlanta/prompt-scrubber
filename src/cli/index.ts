@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
+import { setupConfigCommands } from './commands/config.js';
 import { setupInspectCommand } from './commands/inspect.js';
 import { setupRehydrateCommand } from './commands/rehydrate.js';
 import { setupRulesCommands } from './commands/rules.js';
@@ -39,6 +40,7 @@ setupRehydrateCommand(program);
 setupInspectCommand(program);
 setupSessionsCommands(program);
 setupRulesCommands(program);
+setupConfigCommands(program);
 
 if (process.argv[1] === __filename) {
   program.parseAsync(process.argv).catch((err) => {

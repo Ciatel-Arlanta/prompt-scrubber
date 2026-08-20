@@ -44,6 +44,62 @@ Prints the raw JSON contents of a session map for inspection or manual editing.
 ### `prompt-scrub sessions rm <id>`
 Deletes a session map from the disk permanently.
 
+## Configuration
+
+### `prompt-scrub init`
+Creates a configuration file with the default (empty) schema at the OS config path (`~/.config/prompt-scrub/config.json` on Linux, `~/Library/Application Support/prompt-scrub/config.json` on macOS, `%APPDATA%\prompt-scrub\config.json` on Windows). Parent directories are created if needed. Set `PROMPT_SCRUB_CONFIG_DIR` to relocate the config directory on any platform.
+
+```bash
+$ prompt-scrub init
+Created config file at /home/alice/.config/prompt-scrub/config.json
+```
+
+The generated file documents the supported schema:
+
+```json
+{
+  "rulePacks": [],
+  "urlAllowlist": []
+}
+```
+
+- `rulePacks`: npm package names to load extra detectors from. See [Authoring Rule Packs](../features/authoring-rule-packs.md).
+- `urlAllowlist`: hostnames the `UrlDetector` passes through unchanged. Subdomains are implicitly allowed.
+
+Fails if a config file already exists.
+
+**Options:**
+- `--force`: Overwrite the existing configuration file.
+
+### `prompt-scrub config show`
+Prints the active configuration as JSON on `stdout`, and the path it was read from on `stderr`. If no config file exists, the defaults are printed instead.
+
+```bash
+$ prompt-scrub config show
+Config file: /home/alice/.config/prompt-scrub/config.json
+{
+  "rulePacks": [
+    "prompt-scrub-projectx"
+  ],
+  "urlAllowlist": [
+    "example.com"
+  ]
+}
+```
+
+Entries that do not match the schema are reported on `stderr` and the command exits with code `1`, so it can be used as a config check in scripts. Invalid entries are ignored at runtime rather than failing the scrub:
+
+```bash
+$ prompt-scrub config show
+Config file: /home/alice/.config/prompt-scrub/config.json
+  error: Unknown key "rulePaks". Supported keys: rulePacks, urlAllowlist.
+{
+  "rulePacks": [],
+  "urlAllowlist": []
+}
+Invalid entries are ignored at runtime.
+```
+
 ## Utility
 
 ### `prompt-scrub --version`

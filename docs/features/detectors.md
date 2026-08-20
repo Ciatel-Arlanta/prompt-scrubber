@@ -80,15 +80,16 @@ prompt-scrubber supports distributing rule packs as standalone npm packages. A r
 
 To use a rule pack:
 1. Install it via npm: `npm install some-rule-pack`
-2. Declare it in your configuration. You can do this by adding a `prompt-scrub.rulePacks` array to your local `package.json`, or globally in `~/.config/prompt-scrub/config.json`.
+2. Declare it in your configuration file. Run `prompt-scrub init` to create one, then add the package name to `rulePacks`:
 
 ```json
 {
-  "prompt-scrub": {
-    "rulePacks": ["some-rule-pack"]
-  }
+  "rulePacks": ["some-rule-pack"],
+  "urlAllowlist": []
 }
 ```
+
+Run `prompt-scrub config show` to confirm the tool picked it up.
 
 Once declared, the CLI will automatically discover, load, and merge these detectors into the active set on startup. They participate natively in collision resolution and can be inspected via `prompt-scrub rules list`.
 

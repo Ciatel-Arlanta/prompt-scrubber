@@ -7,6 +7,22 @@ export interface PromptScrubConfig {
   urlAllowlist?: string[];
 }
 
+export interface ConfigFileState {
+  path: string;
+  exists: boolean;
+  errors: string[];
+  config: PromptScrubConfig;
+}
+
+export function createDefaultConfig(): Required<PromptScrubConfig> {
+  return {
+    rulePacks: [],
+    urlAllowlist: [],
+  };
+}
+
+const CONFIG_KEYS = Object.keys(createDefaultConfig());
+
 /**
  * Determines the base configuration directory based on the OS.
  *
@@ -36,40 +52,97 @@ export function getConfigDir(): string {
   }
 }
 
-/**
- * Reads configuration from ~/.config/prompt-scrub/config.json and local package.json,
- * merging the rulePacks arrays.
- */
-export function loadConfig(): PromptScrubConfig {
-  const config: PromptScrubConfig = {
-    rulePacks: [],
-    urlAllowlist: [],
-  };
+function getConfigPath(): string {
+  return path.join(getConfigDir(), 'config.json');
+}
 
-  const rulePacks = new Set<string>();
-  const urlAllowlist = new Set<string>();
+function describeType(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'an array';
+  return typeof value;
+}
 
-  // 1. Read global config
-  const globalConfigPath = path.join(getConfigDir(), 'config.json');
-  if (fs.existsSync(globalConfigPath)) {
-    try {
-      const globalData = JSON.parse(fs.readFileSync(globalConfigPath, 'utf8'));
-      if (Array.isArray(globalData?.rulePacks)) {
-        for (const pack of globalData.rulePacks) {
-          if (typeof pack === 'string') rulePacks.add(pack);
-        }
-      }
-      if (Array.isArray(globalData?.urlAllowlist)) {
-        for (const host of globalData.urlAllowlist) {
-          if (typeof host === 'string') urlAllowlist.add(host);
-        }
-      }
-    } catch (_e) {
-      // Ignore global config read/parse errors
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value.filter((item): item is string => typeof item === 'string')));
+}
+
+function validateConfig(data: unknown): string[] {
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+    return [`Expected a JSON object, received ${describeType(data)}.`];
+  }
+
+  const errors: string[] = [];
+  const record = data as Record<string, unknown>;
+
+  for (const key of Object.keys(record)) {
+    if (!CONFIG_KEYS.includes(key)) {
+      errors.push(`Unknown key "${key}". Supported keys: ${CONFIG_KEYS.join(', ')}.`);
     }
   }
 
-  config.rulePacks = Array.from(rulePacks);
-  config.urlAllowlist = Array.from(urlAllowlist);
-  return config;
+  for (const key of CONFIG_KEYS) {
+    const value = record[key];
+    if (value === undefined) continue;
+
+    if (!Array.isArray(value)) {
+      errors.push(`"${key}" must be an array of strings, received ${describeType(value)}.`);
+    } else if (value.some((item) => typeof item !== 'string')) {
+      errors.push(`"${key}" must contain only strings.`);
+    }
+  }
+
+  return errors;
+}
+
+export function readConfigFile(): ConfigFileState {
+  const configPath = getConfigPath();
+
+  if (!fs.existsSync(configPath)) {
+    return { path: configPath, exists: false, errors: [], config: createDefaultConfig() };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  } catch (error) {
+    const reason = error instanceof SyntaxError ? 'Invalid JSON' : 'Could not read file';
+    return {
+      path: configPath,
+      exists: true,
+      errors: [`${reason}: ${(error as Error).message}`],
+      config: createDefaultConfig(),
+    };
+  }
+
+  const record =
+    parsed !== null && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+
+  return {
+    path: configPath,
+    exists: true,
+    errors: validateConfig(parsed),
+    config: {
+      rulePacks: toStringArray(record.rulePacks),
+      urlAllowlist: toStringArray(record.urlAllowlist),
+    },
+  };
+}
+
+export function writeConfig(config: PromptScrubConfig): string {
+  const configPath = getConfigPath();
+  fs.mkdirSync(path.dirname(configPath), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, {
+    encoding: 'utf8',
+    mode: 0o600,
+  });
+  return configPath;
+}
+
+/**
+ * Reads configuration from ~/.config/prompt-scrub/config.json, dropping any
+ * entries that do not match the schema.
+ */
+export function loadConfig(): PromptScrubConfig {
+  return readConfigFile().config;
 }
