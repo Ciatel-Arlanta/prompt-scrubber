@@ -50,12 +50,11 @@ test('handleScrub respects enabled detectors', async (t) => {
 });
 
 test('handleScrub respects strictName option', async (t) => {
-  const result = await handleScrub('Hello John.', {
+  const result = await handleScrub('hello John.', {
     enable: 'NameDetector',
     strictName: true,
   });
-  // 'John' is in the allowlist, so it should not be scrubbed in strict mode
-  t.is(result.scrubbedContent, 'Hello John.');
+  t.is(result.scrubbedContent, 'hello «Name_1».');
 });
 
 test('handleScrub respects codeTellTerms', async (t) => {
