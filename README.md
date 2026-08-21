@@ -80,6 +80,20 @@ echo "My email is user@example.com" | prompt-scrub scrub
 # stderr: Scrubbed: 1 entity (1 Email)   — pass -q/--quiet to suppress the summary
 ```
 
+**CLI: Watch clipboard**
+```bash
+# Monitor clipboard and automatically scrub sensitive data
+prompt-scrub watch --clipboard
+
+# Watch a file
+prompt-scrub watch --file prompt.txt --once
+
+# Preview changes without writing anything
+prompt-scrub watch --file prompt.txt --dry-run --once
+```
+
+See the [CLI Reference](docs/getting-started/cli.md#watch-mode) for all watch options and platform requirements.
+
 **Node.js API: Scrubbing and Rehydrating**
 ```typescript
 import { scrub, rehydrate } from '@nanocollective/prompt-scrub';
@@ -96,6 +110,23 @@ const { content } = rehydrate({
 });
 console.log(content); // "I see your key is sk-12345"
 ```
+
+## Configuration
+
+`prompt-scrub` reads an optional config file for extra rule packs and URL allowlisting. Create one pre-filled with the default schema:
+
+```bash
+prompt-scrub init
+# Created config file at /home/alice/.config/prompt-scrub/config.json
+```
+
+Print the configuration that is actually active — JSON on `stdout`, the path it came from on `stderr`:
+
+```bash
+prompt-scrub config show
+```
+
+Entries that do not match the schema are reported and exit non-zero, so `config show` doubles as a config check in scripts. See the [CLI reference](docs/getting-started/cli.md#configuration) for the full schema and options.
 
 ## Documentation
 

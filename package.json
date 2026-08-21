@@ -25,7 +25,7 @@
     "test": "tests"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc && chmod +x dist/cli/index.js",
+    "build": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\" && tsc",
     "prepare": "pnpm run build",
     "prepublishOnly": "pnpm run build",
     "pretest": "pnpm run test:types",
@@ -68,12 +68,12 @@
   "homepage": "https://github.com/Nano-Collective/prompt-scrubber#readme",
   "devDependencies": {
     "@ava/typescript": "^7.0.0",
-    "@biomejs/biome": "^2.5.7",
+    "@biomejs/biome": "^2.5.8",
     "@types/node": "^26.2.0",
     "ava": "^8.0.1",
     "c8": "^12.0.0",
     "knip": "^6.32.0",
-    "tsx": "^4.23.11",
+    "tsx": "^4.23.12",
     "typescript": "^7.0.2"
   },
   "ava": {

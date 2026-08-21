@@ -4,11 +4,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
+import { setupConfigCommands } from './commands/config.js';
 import { setupInspectCommand } from './commands/inspect.js';
 import { setupRehydrateCommand } from './commands/rehydrate.js';
 import { setupRulesCommands } from './commands/rules.js';
 import { setupScrubCommand } from './commands/scrub.js';
 import { setupSessionsCommands } from './commands/sessions.js';
+import { setupWatchCommand } from './commands/watch.js';
 
 // Get version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -39,6 +41,8 @@ setupRehydrateCommand(program);
 setupInspectCommand(program);
 setupSessionsCommands(program);
 setupRulesCommands(program);
+setupConfigCommands(program);
+setupWatchCommand(program);
 
 if (process.argv[1] === __filename) {
   program.parseAsync(process.argv).catch((err) => {
