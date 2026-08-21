@@ -78,6 +78,20 @@ echo "My email is user@example.com" | prompt-scrub scrub
 # Output: My email is Email_1
 ```
 
+**CLI: Watch clipboard**
+```bash
+# Monitor clipboard and automatically scrub sensitive data
+prompt-scrub watch --clipboard
+
+# Watch a file
+prompt-scrub watch --file prompt.txt --once
+
+# Preview changes without writing anything
+prompt-scrub watch --file prompt.txt --dry-run --once
+```
+
+See the [CLI Reference](docs/getting-started/cli.md#watch-mode) for all watch options and platform requirements.
+
 **Node.js API: Scrubbing and Rehydrating**
 ```typescript
 import { scrub, rehydrate } from '@nanocollective/prompt-scrub';

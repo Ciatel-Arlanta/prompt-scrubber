@@ -25,7 +25,7 @@
     "test": "tests"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc && chmod +x dist/cli/index.js",
+    "build": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\" && tsc",
     "prepare": "pnpm run build",
     "prepublishOnly": "pnpm run build",
     "pretest": "pnpm run test:types",

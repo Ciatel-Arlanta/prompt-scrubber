@@ -1,3 +1,22 @@
+# Unreleased
+
+## Added
+
+- **Watch mode** — `watch` command for real-time clipboard/file monitoring with automatic scrubbing
+  - `prompt-scrub watch --clipboard` — monitors clipboard, scrubs data, sends notifications
+  - `prompt-scrub watch --file <files...>` — monitors and scrubs files in place
+  - Cross-platform: Windows/macOS/Linux
+  - `--dry-run` previews changes without writing; `--backup` keeps a `<file>.bak` before overwriting
+  - `Ctrl-C` (SIGINT/SIGTERM) clears the poll timer and exits cleanly
+  - Missing platform helpers (`xclip`, `notify-send`, `osascript`) are reported with an install hint instead of failing silently
+  - Options: `--interval`, `--once`, `--dry-run`, `--backup`, `--session-id`, `--disable`, `--enable`, `--url-allowlist`
+  - Documented in `docs/getting-started/cli.md`
+
+## Fixed
+
+- **TypeScript compatibility** — Fixed type handling for `ScrubResult.scrubbedContent`
+- **Windows build** — Cross-platform build script
+
 # 1.0.2
 
 Patch release — dev-dependency and CI maintenance only. No public-API or runtime changes.
