@@ -2,6 +2,10 @@
 
 ## Added
 
+- **Scrub summary** — `scrub` now prints a one-line summary of what it replaced to `stderr`, e.g. `Scrubbed: 3 entities (1 Email, 2 Secrets)`, so the counts no longer require a separate `inspect` run
+  - `-q, --quiet` suppresses the summary for strict pipeline usage; the `Session ID:` line is unaffected
+  - The summary counts replacements made by that run only — repeats of the same value each count, and reusing a session with `--session-id` does not carry earlier counts over
+  - `scrub()` returns the same data to library callers as `result.stats` (`totalEntities`, `byCategory`), aggregated across every message of a `Message[]` input
 - **Watch mode** — `watch` command for real-time clipboard/file monitoring with automatic scrubbing
   - `prompt-scrub watch --clipboard` — monitors clipboard, scrubs data, sends notifications
   - `prompt-scrub watch --file <files...>` — monitors and scrubs files in place

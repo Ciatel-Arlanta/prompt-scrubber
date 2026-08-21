@@ -75,7 +75,9 @@ The hash is deterministic — the same prompt always produces the same hash, so 
 **CLI: Scrubbing text**
 ```bash
 echo "My email is user@example.com" | prompt-scrub scrub
-# Output: My email is Email_1
+# stdout: My email is Email_1
+# stderr: Session ID: 6f1c2b90-...
+# stderr: Scrubbed: 1 entity (1 Email)   — pass -q/--quiet to suppress the summary
 ```
 
 **CLI: Watch clipboard**

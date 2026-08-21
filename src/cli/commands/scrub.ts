@@ -4,6 +4,7 @@ import { loadConfig } from '../../core/config.js';
 
 import { loadConfiguredRulePacks } from '../../core/rule-packs.js';
 import { scrub } from '../../core/scrub.js';
+import type { ScrubStats } from '../../types/index.js';
 
 export async function handleScrub(
   text: string,
@@ -47,6 +48,26 @@ export async function handleScrub(
   return result;
 }
 
+function pluralize(word: string, count: number): string {
+  if (count === 1) return word;
+  if (/(s|x|z|ch|sh)$/i.test(word)) return `${word}es`;
+  if (/[^aeiou]y$/i.test(word)) return `${word.slice(0, -1)}ies`;
+  return `${word}s`;
+}
+
+export function formatScrubSummary(stats: ScrubStats): string {
+  const noun = stats.totalEntities === 1 ? 'entity' : 'entities';
+  if (stats.totalEntities === 0) {
+    return `Scrubbed: 0 ${noun}`;
+  }
+
+  const breakdown = Object.entries(stats.byCategory)
+    .map(([category, count]) => `${count} ${pluralize(category, count)}`)
+    .join(', ');
+
+  return `Scrubbed: ${stats.totalEntities} ${noun} (${breakdown})`;
+}
+
 export function setupScrubCommand(program: Command) {
   program
     .command('scrub')
@@ -70,6 +91,7 @@ export function setupScrubCommand(program: Command) {
       '--url-allowlist <hosts>',
       'Comma-separated list of hostnames to pass-through in URLs (subdomains are implicitly allowed)',
     )
+    .option('-q, --quiet', 'Suppress the scrub summary printed to stderr')
     .action(async (file, options) => {
       let input = '';
 
@@ -105,6 +127,10 @@ export function setupScrubCommand(program: Command) {
       // Print session ID to stderr
       if (result.scrubbedContent !== input) {
         console.error(`Session ID: ${result.sessionId}`);
+      }
+
+      if (!options.quiet) {
+        console.error(formatScrubSummary(result.stats));
       }
     });
 }

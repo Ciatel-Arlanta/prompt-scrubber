@@ -11,11 +11,24 @@ The `prompt-scrub` package provides a command-line interface for manual inspecti
 ## Core Commands
 
 ### `prompt-scrub scrub [file]`
-Reads a message from `stdin` or a file and prints the scrubbed message to `stdout`. The session ID is printed to `stderr`.
+Reads a message from `stdin` or a file and prints the scrubbed message to `stdout`. The session ID and a summary of what was replaced are printed to `stderr`, so `stdout` stays clean for piping.
+
+```bash
+echo "Mail alice@acme.com about sk-abcdefghijklmnopqrstuvwxyz" | prompt-scrub scrub
+```
+
+```
+Mail «Email_1» about «Secret_1»
+Session ID: 6f1c2b90-0d3a-4f8e-9a21-2b7c1e4d5a63
+Scrubbed: 2 entities (1 Email, 1 Secret)
+```
+
+The summary counts replacements, not unique values: a value that appears three times counts three times, even though all three collapse onto the same placeholder. Reusing a session with `--session-id` does not carry counts over — the summary always describes the current run only. When nothing is detected the summary reads `Scrubbed: 0 entities`.
 
 **Options:**
 - `--session-id <id>`: Reuse an existing session map. If omitted, a new UUID is generated.
 - `--disable <detectors>`: Comma-separated list of detectors to disable (e.g. `EmailDetector,PhoneDetector`).
+- `-q, --quiet`: Suppress the summary. The `Session ID:` line is still printed, since scripts need it to rehydrate.
 
 ### `prompt-scrub rehydrate [file]`
 Reads a scrubbed response from `stdin` or a file and prints the rehydrated response to `stdout`.

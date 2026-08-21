@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'ava';
-import { handleScrub } from '../../src/cli/commands/scrub.js';
+import { formatScrubSummary, handleScrub } from '../../src/cli/commands/scrub.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -115,4 +115,26 @@ test.serial('scrub command fails when no stdin is provided', async (t) => {
 
   t.is(exitCode, 1);
   t.true(errorOutput.includes('No input provided'));
+});
+
+test('formatScrubSummary renders counts, plurals and the empty case', (t) => {
+  t.is(formatScrubSummary({ totalEntities: 0, byCategory: {} }), 'Scrubbed: 0 entities');
+  t.is(
+    formatScrubSummary({ totalEntities: 1, byCategory: { Email: 1 } }),
+    'Scrubbed: 1 entity (1 Email)',
+  );
+  t.is(
+    formatScrubSummary({ totalEntities: 3, byCategory: { Email: 1, Secret: 2 } }),
+    'Scrubbed: 3 entities (1 Email, 2 Secrets)',
+  );
+  t.is(
+    formatScrubSummary({ totalEntities: 4, byCategory: { Address: 2, Identity: 2 } }),
+    'Scrubbed: 4 entities (2 Addresses, 2 Identities)',
+  );
+});
+
+test('handleScrub returns stats alongside the scrubbed content', async (t) => {
+  const result = await handleScrub('Mail alice@example.com and bob@example.com', {});
+  t.is(result.stats.totalEntities, 2);
+  t.deepEqual(result.stats.byCategory, { Email: 2 });
 });

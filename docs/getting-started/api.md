@@ -24,6 +24,7 @@ const result = scrub({
 
 // result.scrubbedContent contains the text with placeholders
 // result.sessionId contains the session ID used
+// result.stats summarises what was replaced in this call
 ```
 
 ### `rehydrate`
@@ -66,9 +67,15 @@ export interface ScrubOptions {
   disabledDetectors?: string[]; // Array of detector names to skip
 }
 
+export interface ScrubStats {
+  totalEntities: number; // Replacements made by this call
+  byCategory: Record<string, number>; // Replacements per category, keyed in order of appearance
+}
+
 export interface ScrubResult {
   scrubbedContent: string | Message[];
   sessionId: string;
+  stats: ScrubStats;
 }
 
 export interface RehydrateRequest {
