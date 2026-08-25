@@ -56,17 +56,43 @@ You can also run any of these individual gates in isolation by calling the scrip
 
 ## Release Process
 
-**Note for contributors:** Please do not bump the version number in `package.json` in your pull requests. Version bumping and releases are handled exclusively by the project maintainers using automated workflows when merging to `main`.
+**Cutting a release is handled exclusively by code owners / maintainers.** Contributors should not bump the version, edit `CHANGELOG.md` directly, or write a release commit - these are maintainer responsibilities. Contributors DO, however, add a changeset to their PR (see below); that is how your change gets a changelog entry.
 
-### How releases work
+We use [Changesets](https://github.com/changesets/changesets) to manage versions and the changelog. The short version:
 
-When a commit lands on `main` with a `package.json` version that differs from the currently published npm version, the `release.yml` workflow automatically:
+- Every user-facing PR includes a `.changeset/*.md` file describing the change (written by the author, in our changelog voice).
+- A bot keeps a single open "Version Packages" PR that accumulates those entries and rolls them into `CHANGELOG.md` with the version bump.
+- A maintainer cuts a release simply by merging that PR. The existing `release.yml` then publishes to npm and creates the GitHub Release automatically.
 
-1. Runs the full test suite and build.
-2. Publishes the package to npm under `@nanocollective/prompt-scrub`.
-3. Creates a GitHub Release with install and usage instructions.
+### Adding a changeset (contributors)
 
-Prerelease versions (`-alpha`, `-beta`, `-rc`) are published to their corresponding npm dist-tags instead of `latest`.
+When your change is user-facing, add a changeset before your PR is merged:
+
+```bash
+pnpm changeset
+```
+
+Pick the bump type and write the entry:
+
+- **Patch** (`1.0.2` -> `1.0.3`) - bug fixes only, no behavior changes
+- **Minor** (`1.0.2` -> `1.1.0`) - new features, backwards-compatible
+- **Major** - breaking changes
+
+The markdown body you write IS the changelog entry, verbatim. Follow the existing voice: a self-contained bullet describing user-facing impact, with attribution where relevant (`Thanks to @username. Closes #123.`). Commit the generated `.changeset/*.md` file with your PR.
+
+If your PR is docs-only or a chore that needs no release note, you can skip the changeset (a bot will leave a friendly reminder you can ignore), or record the intent explicitly with `pnpm changeset --empty`.
+
+### Cutting the release (maintainers)
+
+Do each step in order - skipping the test gate is how broken releases ship.
+
+1. **Ensure all tests pass on `main`** before merging the Version Packages PR. The release workflow does run the full test suite, but a green `main` saves a re-run.
+2. **Review the Version Packages PR.** It will contain:
+   - The version bump in `package.json` (patch / minor / major, depending on the changesets).
+   - A new section at the top of `CHANGELOG.md` (`# X.Y.Z`) with the rolled-up entries.
+   - Deletion of the consumed `.changeset/*.md` files.
+3. **Merge the Version Packages PR.** Merging pushes a version bump to `main`, which `release.yml` detects and publishes.
+4. **Verify the release.** `release.yml` will publish to npm (under `latest`, or `alpha`/`beta`/`rc` for prereleases), create a GitHub Release, and post a summary in the action log.
 
 ### Required secrets (maintainers only)
 
