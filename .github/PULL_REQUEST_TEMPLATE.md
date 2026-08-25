@@ -20,3 +20,4 @@ Please describe how you tested this change.
 - [ ] I have added/updated documentation if necessary.
 - [ ] I have added/updated tests if necessary.
 - [ ] I have NOT bumped the version in `package.json` (maintainers will handle this).
+- [ ] I have added a changeset for user-facing changes (`pnpm changeset`) or noted in the PR description that one isn't needed (docs-only / chore).
