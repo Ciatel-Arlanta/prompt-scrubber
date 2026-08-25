@@ -15,10 +15,7 @@ export function setupSessionsCommands(program: Command) {
     .description('List all saved sessions')
     .action(() => {
       try {
-        const config = loadConfig();
-        if (config.sessionTtlDays) {
-          gcSessions(config.sessionTtlDays);
-        }
+        gcSessions(loadConfig().sessionTtlDays ?? 7);
       } catch (e) {
         console.error(`Warning: Failed to run session garbage collection: ${(e as Error).message}`);
       }
@@ -29,14 +26,14 @@ export function setupSessionsCommands(program: Command) {
         return;
       }
 
-      console.log(`${'ID'.padEnd(40)} | ${'Created'.padEnd(25)} | Placeholders`);
+      console.log(`${'ID'.padEnd(40)} | ${'Last Modified'.padEnd(25)} | Placeholders`);
       console.log('-'.repeat(85));
 
       for (const session of sessions) {
         // Read the map to count placeholders
         const map = readSessionMap(session.id);
         const count = Object.keys(map).length;
-        const dateStr = session.createdAt.toLocaleString();
+        const dateStr = session.lastModifiedAt.toLocaleString();
 
         console.log(`${session.id.padEnd(40)} | ${dateStr.padEnd(25)} | ${count}`);
       }
@@ -94,12 +91,7 @@ export function setupSessionsCommands(program: Command) {
     .description('Garbage collect expired sessions')
     .action(() => {
       try {
-        const config = loadConfig();
-        if (!config.sessionTtlDays) {
-          console.log('Session TTL is disabled or invalid in configuration.');
-          return;
-        }
-        const deletedCount = gcSessions(config.sessionTtlDays);
+        const deletedCount = gcSessions(loadConfig().sessionTtlDays ?? 7);
         console.log(`Deleted ${deletedCount} expired session(s).`);
       } catch (e) {
         console.error(`Error: Failed to run session garbage collection: ${(e as Error).message}`);

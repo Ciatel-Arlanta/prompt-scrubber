@@ -192,6 +192,34 @@ test.serial('CLI: sessions rm --all successfully removes multiple sessions', (t)
   t.is(result.status, 0);
   t.true(result.stdout.includes('Deleted 2 sessions.'));
 });
+test.serial('CLI: sessions gc garbage collects expired sessions', (t) => {
+  // Clear the dir first
+  const sessionsDir = path.join(tmpConfigDir, 'prompt-scrub', 'sessions');
+  if (fs.existsSync(sessionsDir)) {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+
+  // Create two sessions
+  const scrub1 = runCli(['scrub'], 'Contact old@example.com');
+  const scrub2 = runCli(['scrub'], 'Contact new@example.com');
+  
+  const id1 = scrub1.stderr.match(/Session ID: ([\w-]+)/)?.[1];
+  const id2 = scrub2.stderr.match(/Session ID: ([\w-]+)/)?.[1];
+  
+  if (!id1 || !id2) return t.fail('Failed to extract session IDs');
+
+  // Age the first session by 10 days
+  const oldPath = path.join(sessionsDir, `${id1}.json`);
+  const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+  fs.utimesSync(oldPath, tenDaysAgo, tenDaysAgo);
+
+  const result = runCli(['sessions', 'gc']);
+  t.is(result.status, 0);
+  t.true(result.stdout.includes('Deleted 1 expired session(s).'));
+  
+  t.false(fs.existsSync(oldPath));
+  t.true(fs.existsSync(path.join(sessionsDir, `${id2}.json`)));
+});
 
 test.serial('CLI: rehydrate fails when input file does not exist', (t) => {
   const result = runCli(['rehydrate', '--session-id', 'test-id', 'non-existent-file-123.txt']);

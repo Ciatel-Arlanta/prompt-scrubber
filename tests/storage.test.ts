@@ -273,7 +273,7 @@ test('readSessionMap fails to rename corrupt file gracefully', (t) => {
   fs.chmodSync(dirPath, 0o777); // Restore to allow cleanup
 });
 
-test('gcSessions removes expired sessions and keeps active ones', (t) => {
+test.serial('gcSessions removes expired sessions and keeps active ones', (t) => {
   const idExpired = 'gc-test-expired';
   const idActive = 'gc-test-active';
 
@@ -292,7 +292,7 @@ test('gcSessions removes expired sessions and keeps active ones', (t) => {
   t.true(fs.existsSync(getSessionStoragePath(idActive)));
 });
 
-test('gcSessions returns 0 if ttlDays is 0 or less', (t) => {
+test.serial('gcSessions returns 0 if ttlDays is 0 or less', (t) => {
   const id = 'gc-test-zero-ttl';
   writeSessionMap(id, { '«Email_1»': 'zero@test.com' });
 
@@ -303,4 +303,34 @@ test('gcSessions returns 0 if ttlDays is 0 or less', (t) => {
   const deletedCount = gcSessions(0);
   t.is(deletedCount, 0);
   t.true(fs.existsSync(oldPath));
+});
+
+test.serial('gcSessions returns 0 if ttlDays is negative', (t) => {
+  const deletedCount = gcSessions(-5);
+  t.is(deletedCount, 0);
+});
+
+test.serial('gcSessions gracefully handles missing sessions directory', (t) => {
+  const sessionsDir = path.join(tmpConfigDir, 'prompt-scrub', 'sessions');
+  if (fs.existsSync(sessionsDir)) {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+  const deletedCount = gcSessions(7);
+  t.is(deletedCount, 0);
+});
+
+test.serial('gcSessions ignores errors (e.g. concurrent deletion)', (t) => {
+  const id = 'gc-test-concurrent';
+  const oldPath = getSessionStoragePath(id);
+  // Create a directory instead of a file so fs.unlinkSync throws EISDIR
+  fs.mkdirSync(oldPath, { recursive: true });
+  const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+  fs.utimesSync(oldPath, tenDaysAgo, tenDaysAgo);
+
+  const deletedCount = gcSessions(7);
+  t.is(deletedCount, 0);
+  t.true(fs.existsSync(oldPath));
+  
+  // Cleanup
+  fs.rmdirSync(oldPath);
 });

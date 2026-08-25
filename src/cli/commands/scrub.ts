@@ -29,6 +29,13 @@ export async function handleScrub(
     : [];
 
   const config = loadConfig();
+
+  try {
+    gcSessions(config.sessionTtlDays ?? 7);
+  } catch (e) {
+    console.error(`Warning: Failed to run session garbage collection: ${(e as Error).message}`);
+  }
+
   const urlAllowlist = Array.from(new Set([...(config.urlAllowlist || []), ...cliUrlAllowlist]));
 
   const { detectors: rulePackDetectors } = await loadConfiguredRulePacks();
@@ -94,17 +101,6 @@ export function setupScrubCommand(program: Command) {
     )
     .option('-q, --quiet', 'Suppress the scrub summary printed to stderr')
     .action(async (file, options) => {
-      // Attempt session GC before starting
-      try {
-        const config = loadConfig();
-        if (config.sessionTtlDays) {
-          gcSessions(config.sessionTtlDays);
-        }
-      } catch (e) {
-        // Log a warning if GC fails, but continue with scrub
-        console.error(`Warning: Failed to run session garbage collection: ${(e as Error).message}`);
-      }
-
       let input = '';
 
       if (file) {

@@ -78,7 +78,7 @@ export function deleteSessionMap(sessionId: string): boolean {
 /**
  * Lists all available session IDs by inspecting the storage directory.
  */
-export function listSessions(): Array<{ id: string; sizeBytes: number; createdAt: Date }> {
+export function listSessions(): Array<{ id: string; sizeBytes: number; lastModifiedAt: Date }> {
   const sessionsDir = path.join(getConfigDir(), 'sessions');
   if (!fs.existsSync(sessionsDir)) {
     return [];
@@ -93,11 +93,11 @@ export function listSessions(): Array<{ id: string; sizeBytes: number; createdAt
         id: path.basename(file, '.json'),
         sizeBytes: stats.size,
         mtimeMs: stats.mtimeMs,
-        createdAt: stats.mtime,
+        lastModifiedAt: stats.mtime,
       };
     })
     .sort((a, b) => b.mtimeMs - a.mtimeMs)
-    .map(({ id, sizeBytes, createdAt }) => ({ id, sizeBytes, createdAt }));
+    .map(({ id, sizeBytes, lastModifiedAt }) => ({ id, sizeBytes, lastModifiedAt }));
 }
 
 /**
@@ -106,21 +106,27 @@ export function listSessions(): Array<{ id: string; sizeBytes: number; createdAt
 export function gcSessions(ttlDays: number): number {
   if (ttlDays <= 0) return 0;
 
+  const sessionsDir = path.join(getConfigDir(), 'sessions');
+  if (!fs.existsSync(sessionsDir)) return 0;
+
   let deletedCount = 0;
-  const sessions = listSessions();
   const now = Date.now();
   const ttlMs = ttlDays * 24 * 60 * 60 * 1000;
 
-  for (const session of sessions) {
+  const files = fs.readdirSync(sessionsDir);
+  for (const file of files) {
+    const filePath = path.join(sessionsDir, file);
     try {
-      const ageMs = now - session.createdAt.getTime();
+      const stats = fs.statSync(filePath);
+      const ageMs = now - stats.mtimeMs;
       if (ageMs >= ttlMs) {
-        if (deleteSessionMap(session.id)) {
+        fs.unlinkSync(filePath);
+        if (file.endsWith('.json')) {
           deletedCount++;
         }
       }
     } catch {
-      // Best-effort cleanup: ignore individual failures so other sessions can still be processed.
+      // Best-effort cleanup: ignore individual failures so other files can still be processed.
     }
   }
 
