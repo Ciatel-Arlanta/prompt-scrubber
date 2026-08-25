@@ -11,11 +11,24 @@ The `prompt-scrub` package provides a command-line interface for manual inspecti
 ## Core Commands
 
 ### `prompt-scrub scrub [file]`
-Reads a message from `stdin` or a file and prints the scrubbed message to `stdout`. The session ID is printed to `stderr`.
+Reads a message from `stdin` or a file and prints the scrubbed message to `stdout`. The session ID and a summary of what was replaced are printed to `stderr`, so `stdout` stays clean for piping.
+
+```bash
+echo "Mail alice@acme.com about sk-abcdefghijklmnopqrstuvwxyz" | prompt-scrub scrub
+```
+
+```
+Mail «Email_1» about «Secret_1»
+Session ID: 6f1c2b90-0d3a-4f8e-9a21-2b7c1e4d5a63
+Scrubbed: 2 entities (1 Email, 1 Secret)
+```
+
+The summary counts replacements, not unique values: a value that appears three times counts three times, even though all three collapse onto the same placeholder. Reusing a session with `--session-id` does not carry counts over — the summary always describes the current run only. When nothing is detected the summary reads `Scrubbed: 0 entities`.
 
 **Options:**
 - `--session-id <id>`: Reuse an existing session map. If omitted, a new UUID is generated.
 - `--disable <detectors>`: Comma-separated list of detectors to disable (e.g. `EmailDetector,PhoneDetector`).
+- `-q, --quiet`: Suppress the summary. The `Session ID:` line is still printed, since scripts need it to rehydrate.
 
 ### `prompt-scrub rehydrate [file]`
 Reads a scrubbed response from `stdin` or a file and prints the rehydrated response to `stdout`.
@@ -33,6 +46,50 @@ Reads a message from `stdin` or a file and prints a human-readable diff of the t
 - `--disable <detectors>`: Comma-separated list of detectors to disable.
 - `--hash`: Print *only* the SHA-256 hash for scripting purposes.
 
+## Watch Mode
+
+### `prompt-scrub watch`
+Continuously monitors your system clipboard and/or one or more files, scrubbing sensitive content in place as soon as it appears. This is aimed at the copy-paste workflow: copy a prompt containing real data, and it is scrubbed before you paste it into a web-based LLM.
+
+At least one of `--clipboard` or `--file` is required. A desktop notification is emitted for each scrub, summarising what was replaced.
+
+```bash
+# Scrub the clipboard continuously
+prompt-scrub watch --clipboard
+
+# Scrub two files, checking twice a second
+prompt-scrub watch --file prompt.txt notes.md --interval 500
+
+# See what would change without writing anything
+prompt-scrub watch --file prompt.txt --dry-run --once
+```
+
+Press `Ctrl-C` to stop watching; the poll loop is cleared and the process exits cleanly.
+
+**Options:**
+- `-c, --clipboard`: Monitor the system clipboard.
+- `-f, --file <files...>`: One or more files to monitor and rewrite in place.
+- `-i, --interval <ms>`: Polling interval in milliseconds (default `1000`).
+- `--once`: Run a single check pass and exit. Useful in scripts and CI.
+- `--dry-run`: Report what would be scrubbed without writing the clipboard or any file.
+- `--backup`: Write `<file>.bak` containing the pre-scrub content before overwriting a watched file.
+- `--session-id <id>`: Reuse an existing session map so placeholders stay stable across runs.
+- `--disable <detectors>`: Comma-separated list of detectors to skip.
+- `--enable <detectors>`: Comma-separated list of off-by-default detectors to enable.
+- `--strict-name`: Enable strict allowlisting for `NameDetector`.
+- `--code-tell-terms <terms>`: Comma-separated list of private identifiers to detect.
+- `--url-allowlist <hosts>`: Comma-separated list of hostnames to pass through.
+
+**Platform requirements:**
+
+Watch mode shells out to a small platform helper for clipboard access and notifications. If the required binary is missing, clipboard monitoring fails immediately with an actionable error, and notifications degrade to a single warning on `stderr` rather than failing silently.
+
+| Platform | Clipboard | Notifications |
+| --- | --- | --- |
+| Windows | `powershell.exe` | `powershell.exe` |
+| macOS | `pbpaste` / `pbcopy` | `osascript` |
+| Linux | `xclip` | `notify-send` (`libnotify-bin`) |
+
 ## Session Management
 
 ### `prompt-scrub sessions list`
@@ -43,6 +100,62 @@ Prints the raw JSON contents of a session map for inspection or manual editing.
 
 ### `prompt-scrub sessions rm <id>`
 Deletes a session map from the disk permanently.
+
+## Configuration
+
+### `prompt-scrub init`
+Creates a configuration file with the default (empty) schema at the OS config path (`~/.config/prompt-scrub/config.json` on Linux, `~/Library/Application Support/prompt-scrub/config.json` on macOS, `%APPDATA%\prompt-scrub\config.json` on Windows). Parent directories are created if needed. Set `PROMPT_SCRUB_CONFIG_DIR` to relocate the config directory on any platform.
+
+```bash
+$ prompt-scrub init
+Created config file at /home/alice/.config/prompt-scrub/config.json
+```
+
+The generated file documents the supported schema:
+
+```json
+{
+  "rulePacks": [],
+  "urlAllowlist": []
+}
+```
+
+- `rulePacks`: npm package names to load extra detectors from. See [Authoring Rule Packs](../features/authoring-rule-packs.md).
+- `urlAllowlist`: hostnames the `UrlDetector` passes through unchanged. Subdomains are implicitly allowed.
+
+Fails if a config file already exists.
+
+**Options:**
+- `--force`: Overwrite the existing configuration file.
+
+### `prompt-scrub config show`
+Prints the active configuration as JSON on `stdout`, and the path it was read from on `stderr`. If no config file exists, the defaults are printed instead.
+
+```bash
+$ prompt-scrub config show
+Config file: /home/alice/.config/prompt-scrub/config.json
+{
+  "rulePacks": [
+    "prompt-scrub-projectx"
+  ],
+  "urlAllowlist": [
+    "example.com"
+  ]
+}
+```
+
+Entries that do not match the schema are reported on `stderr` and the command exits with code `1`, so it can be used as a config check in scripts. Invalid entries are ignored at runtime rather than failing the scrub:
+
+```bash
+$ prompt-scrub config show
+Config file: /home/alice/.config/prompt-scrub/config.json
+  error: Unknown key "rulePaks". Supported keys: rulePacks, urlAllowlist.
+{
+  "rulePacks": [],
+  "urlAllowlist": []
+}
+Invalid entries are ignored at runtime.
+```
 
 ## Utility
 

@@ -192,7 +192,7 @@ test('NameDetector works when explicitly enabled', (t) => {
 });
 
 test('NameDetector works in strict mode', (t) => {
-  // 'John' and 'London' (not in allowlist) vs allowlisted 'France'
+  // Names and unknown proper nouns are detected, while allowlisted countries are not.
   const text = 'John visited France and London.';
   const scrubbed = scrub({
     content: text,
@@ -202,9 +202,7 @@ test('NameDetector works in strict mode', (t) => {
     },
   });
 
-  // France is allowlisted, John is allowlisted (wait, 'John' is in allowlist!).
-  // London is not allowlisted.
-  t.is(scrubbed.scrubbedContent, 'John visited France and «Name_1».');
+  t.is(scrubbed.scrubbedContent, '«Name_2» visited France and «Name_1».');
 });
 
 test('NameDetector round-trips correctly', (t) => {
@@ -242,4 +240,84 @@ test('CodeTellDetector runs when terms are provided and round-trips correctly', 
     sessionId: scrubbed.sessionId,
   });
   t.is(restored.content, text);
+});
+
+// --- Statistics ---
+
+test('stats report totals and per-category counts in order of appearance', (t) => {
+  const result = scrub({
+    content:
+      'Mail alice@foo.com about sk-abcdefghijklmnopqrstuvwxyz and sk-0123456789abcdefghijklm',
+  });
+
+  t.is(result.stats.totalEntities, 3);
+  t.deepEqual(result.stats.byCategory, { Email: 1, Secret: 2 });
+  t.deepEqual(Object.keys(result.stats.byCategory), ['Email', 'Secret']);
+});
+
+test('stats count every replacement, including repeats of the same value', (t) => {
+  const result = scrub({ content: 'dup@example.com and dup@example.com' });
+
+  t.is(result.scrubbedContent, '«Email_1» and «Email_1»');
+  t.is(result.stats.totalEntities, 2);
+  t.deepEqual(result.stats.byCategory, { Email: 2 });
+});
+
+test('stats are zeroed when nothing is detected', (t) => {
+  const result = scrub({ content: 'nothing sensitive here' });
+
+  t.is(result.stats.totalEntities, 0);
+  t.deepEqual(result.stats.byCategory, {});
+});
+
+test('stats aggregate across every message of a Message[] input', (t) => {
+  const result = scrub({
+    content: [
+      { role: 'user', content: 'Mail alice@foo.com' },
+      { role: 'assistant', content: 'See https://api.example.com and bob@foo.com' },
+    ],
+  });
+
+  t.is(result.stats.totalEntities, 3);
+  t.deepEqual(result.stats.byCategory, { Email: 2, Url: 1 });
+});
+
+test('stats cover only the current call when a session is reused', (t) => {
+  const first = scrub({ content: 'Mail alice@foo.com', sessionId: 'stats-session' });
+  const second = scrub({
+    content: 'Mail alice@foo.com and bob@foo.com',
+    sessionId: 'stats-session',
+  });
+
+  t.is(first.stats.totalEntities, 1);
+  t.is(second.stats.totalEntities, 2);
+  t.deepEqual(second.stats.byCategory, { Email: 2 });
+});
+
+test('stats include categories contributed by custom detectors', (t) => {
+  const result = scrub({
+    content: 'ticket JIRA-42 for alice@foo.com',
+    options: {
+      customDetectors: [
+        {
+          name: 'TicketDetector',
+          detect: (text: string) => {
+            const match = text.match(/JIRA-\d+/);
+            if (!match || match.index === undefined) return [];
+            return [
+              {
+                category: 'Ticket',
+                span: [match.index, match.index + match[0].length] as [number, number],
+                value: match[0],
+                placeholderPrefix: 'Ticket',
+              },
+            ];
+          },
+        },
+      ],
+    },
+  });
+
+  t.is(result.stats.totalEntities, 2);
+  t.deepEqual(result.stats.byCategory, { Ticket: 1, Email: 1 });
 });

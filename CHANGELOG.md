@@ -1,3 +1,26 @@
+# Unreleased
+
+## Added
+
+- **Scrub summary** — `scrub` now prints a one-line summary of what it replaced to `stderr`, e.g. `Scrubbed: 3 entities (1 Email, 2 Secrets)`, so the counts no longer require a separate `inspect` run
+  - `-q, --quiet` suppresses the summary for strict pipeline usage; the `Session ID:` line is unaffected
+  - The summary counts replacements made by that run only — repeats of the same value each count, and reusing a session with `--session-id` does not carry earlier counts over
+  - `scrub()` returns the same data to library callers as `result.stats` (`totalEntities`, `byCategory`), aggregated across every message of a `Message[]` input
+- **Watch mode** — `watch` command for real-time clipboard/file monitoring with automatic scrubbing
+  - `prompt-scrub watch --clipboard` — monitors clipboard, scrubs data, sends notifications
+  - `prompt-scrub watch --file <files...>` — monitors and scrubs files in place
+  - Cross-platform: Windows/macOS/Linux
+  - `--dry-run` previews changes without writing; `--backup` keeps a `<file>.bak` before overwriting
+  - `Ctrl-C` (SIGINT/SIGTERM) clears the poll timer and exits cleanly
+  - Missing platform helpers (`xclip`, `notify-send`, `osascript`) are reported with an install hint instead of failing silently
+  - Options: `--interval`, `--once`, `--dry-run`, `--backup`, `--session-id`, `--disable`, `--enable`, `--url-allowlist`
+  - Documented in `docs/getting-started/cli.md`
+
+## Fixed
+
+- **TypeScript compatibility** — Fixed type handling for `ScrubResult.scrubbedContent`
+- **Windows build** — Cross-platform build script
+
 # 1.0.2
 
 Patch release — dev-dependency and CI maintenance only. No public-API or runtime changes.

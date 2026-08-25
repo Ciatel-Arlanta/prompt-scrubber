@@ -7,7 +7,7 @@ import { PostalAddressDetector } from '../detectors/postal-address.js';
 import { SecretDetector } from '../detectors/secret.js';
 import { UrlDetector } from '../detectors/url.js';
 import { SessionManager } from '../session/session-manager.js';
-import type { Detector, Message, ScrubRequest, ScrubResult } from '../types/index.js';
+import type { Detector, Message, ScrubRequest, ScrubResult, ScrubStats } from '../types/index.js';
 import { resolveCollisions } from './collision-resolver.js';
 
 const DEFAULT_DETECTORS: Detector[] = [
@@ -21,9 +21,14 @@ const DEFAULT_DETECTORS: Detector[] = [
 
 /**
  * Scrubs a single string, returning the scrubbed text.
- * All replacements are recorded in the provided SessionManager.
+ * All replacements are recorded in the provided SessionManager and counted into `stats`.
  */
-function scrubString(text: string, detectors: Detector[], session: SessionManager): string {
+function scrubString(
+  text: string,
+  detectors: Detector[],
+  session: SessionManager,
+  stats: ScrubStats,
+): string {
   // Run all detectors and flatten results
   const allFindings = detectors.flatMap((d) => d.detect(text));
 
@@ -32,6 +37,11 @@ function scrubString(text: string, detectors: Detector[], session: SessionManage
 
   if (findings.length === 0) {
     return text;
+  }
+
+  for (const finding of findings) {
+    stats.totalEntities += 1;
+    stats.byCategory[finding.category] = (stats.byCategory[finding.category] ?? 0) + 1;
   }
 
   // Replace right-to-left so earlier offsets stay valid
@@ -104,16 +114,17 @@ export function scrub(request: ScrubRequest): ScrubResult {
 
   const session = new SessionManager(sessionId, sessionMap);
   const detectors = getActiveDetectors(options);
+  const stats: ScrubStats = { totalEntities: 0, byCategory: {} };
 
   let scrubbedContent: string | Message[];
 
   if (typeof content === 'string') {
-    scrubbedContent = scrubString(content, detectors, session);
+    scrubbedContent = scrubString(content, detectors, session, stats);
   } else {
     // Message[] — scrub each message's content independently, preserve structure
     scrubbedContent = content.map((msg) => ({
       ...msg,
-      content: scrubString(msg.content, detectors, session),
+      content: scrubString(msg.content, detectors, session, stats),
     }));
   }
 
@@ -126,6 +137,7 @@ export function scrub(request: ScrubRequest): ScrubResult {
   const res: ScrubResult = {
     scrubbedContent,
     sessionMap: session.getMap(),
+    stats,
   };
   const sid = session.getSessionId();
   if (sid) {
