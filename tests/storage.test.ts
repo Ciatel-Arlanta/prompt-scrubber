@@ -330,7 +330,7 @@ test.serial('gcSessions ignores errors (e.g. concurrent deletion)', (t) => {
   const deletedCount = gcSessions(7);
   t.is(deletedCount, 0);
   t.true(fs.existsSync(oldPath));
-  
+
   // Cleanup
   fs.rmdirSync(oldPath);
 });
