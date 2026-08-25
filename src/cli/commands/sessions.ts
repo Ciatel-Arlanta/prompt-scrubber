@@ -1,5 +1,11 @@
 import type { Command } from 'commander';
-import { deleteSessionMap, listSessions, readSessionMap } from '../../session/storage.js';
+import {
+  deleteSessionMap,
+  listSessions,
+  readSessionMap,
+  gcSessions,
+} from '../../session/storage.js';
+import { loadConfig } from '../../core/config.js';
 
 export function setupSessionsCommands(program: Command) {
   const sessionsCommand = program.command('sessions').description('Manage scrub sessions');
@@ -8,20 +14,26 @@ export function setupSessionsCommands(program: Command) {
     .command('list')
     .description('List all saved sessions')
     .action(() => {
+      try {
+        gcSessions(loadConfig().sessionTtlDays ?? 7);
+      } catch (e) {
+        console.error(`Warning: Failed to run session garbage collection: ${(e as Error).message}`);
+      }
+
       const sessions = listSessions();
       if (sessions.length === 0) {
         console.log('No saved sessions.');
         return;
       }
 
-      console.log(`${'ID'.padEnd(40)} | ${'Created'.padEnd(25)} | Placeholders`);
+      console.log(`${'ID'.padEnd(40)} | ${'Last Modified'.padEnd(25)} | Placeholders`);
       console.log('-'.repeat(85));
 
       for (const session of sessions) {
         // Read the map to count placeholders
         const map = readSessionMap(session.id);
         const count = Object.keys(map).length;
-        const dateStr = session.createdAt.toLocaleString();
+        const dateStr = session.lastModifiedAt.toLocaleString();
 
         console.log(`${session.id.padEnd(40)} | ${dateStr.padEnd(25)} | ${count}`);
       }
@@ -70,6 +82,19 @@ export function setupSessionsCommands(program: Command) {
         console.log(`Session ${id} deleted.`);
       } else {
         console.error(`Session ${id} not found.`);
+        process.exit(1);
+      }
+    });
+
+  sessionsCommand
+    .command('gc')
+    .description('Garbage collect expired sessions')
+    .action(() => {
+      try {
+        const deletedCount = gcSessions(loadConfig().sessionTtlDays ?? 7);
+        console.log(`Deleted ${deletedCount} expired session(s).`);
+      } catch (e) {
+        console.error(`Error: Failed to run session garbage collection: ${(e as Error).message}`);
         process.exit(1);
       }
     });

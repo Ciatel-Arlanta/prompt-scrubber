@@ -34,21 +34,21 @@ test.after.always(() => {
   }
 });
 
-test('CLI: scrub reads from stdin and outputs to stdout/stderr', (t) => {
+test.serial('CLI: scrub reads from stdin and outputs to stdout/stderr', (t) => {
   const result = runCli(['scrub'], 'Contact me at alice@example.com');
   t.is(result.status, 0);
   t.is(result.stdout, 'Contact me at «Email_1»');
   t.regex(result.stderr, /Session ID: \w+/);
 });
 
-test('CLI: scrub prints an entity summary to stderr', (t) => {
+test.serial('CLI: scrub prints an entity summary to stderr', (t) => {
   const result = runCli(['scrub'], 'Mail alice@example.com about sk-abcdefghijklmnopqrstuvwxyz');
   t.is(result.status, 0);
   t.true(result.stderr.includes('Scrubbed: 2 entities (1 Email, 1 Secret)'));
   t.false(result.stdout.includes('Scrubbed:'));
 });
 
-test('CLI: scrub reports zero entities when nothing is detected', (t) => {
+test.serial('CLI: scrub reports zero entities when nothing is detected', (t) => {
   const result = runCli(['scrub'], 'nothing sensitive here');
   t.is(result.status, 0);
   t.is(result.stdout, 'nothing sensitive here');
@@ -56,7 +56,7 @@ test('CLI: scrub reports zero entities when nothing is detected', (t) => {
   t.false(result.stderr.includes('Session ID'));
 });
 
-test('CLI: scrub --quiet suppresses the summary but keeps the session ID', (t) => {
+test.serial('CLI: scrub --quiet suppresses the summary but keeps the session ID', (t) => {
   const result = runCli(['scrub', '--quiet'], 'Contact me at alice@example.com');
   t.is(result.status, 0);
   t.is(result.stdout, 'Contact me at «Email_1»');
@@ -64,13 +64,13 @@ test('CLI: scrub --quiet suppresses the summary but keeps the session ID', (t) =
   t.regex(result.stderr, /Session ID: \S+/);
 });
 
-test('CLI: scrub -q is the short form of --quiet', (t) => {
+test.serial('CLI: scrub -q is the short form of --quiet', (t) => {
   const result = runCli(['scrub', '-q'], 'Contact me at alice@example.com');
   t.is(result.status, 0);
   t.false(result.stderr.includes('Scrubbed:'));
 });
 
-test('CLI: rehydrate reads from stdin and restores', (t) => {
+test.serial('CLI: rehydrate reads from stdin and restores', (t) => {
   // Step 1: scrub
   const scrubRes = runCli(['scrub'], 'Secret: sk-abcdefghijklmnopqrstuvwxyz');
   const sessionIdMatch = scrubRes.stderr.match(/Session ID: (\S+)/);
@@ -83,7 +83,7 @@ test('CLI: rehydrate reads from stdin and restores', (t) => {
   t.is(rehydrateRes.stdout, 'Secret: sk-abcdefghijklmnopqrstuvwxyz');
 });
 
-test('CLI: inspect does a dry run and prints hash', (t) => {
+test.serial('CLI: inspect does a dry run and prints hash', (t) => {
   const result = runCli(['inspect'], 'Check alice@example.com');
   t.is(result.status, 0);
   t.true(result.stdout.includes('alice@example.com'));
@@ -92,7 +92,7 @@ test('CLI: inspect does a dry run and prints hash', (t) => {
   t.true(result.stdout.includes('Hash: '));
 });
 
-test('CLI: inspect --hash prints only the hash', (t) => {
+test.serial('CLI: inspect --hash prints only the hash', (t) => {
   const result = runCli(['inspect', '--hash'], 'Check alice@example.com');
   t.is(result.status, 0);
   t.false(result.stdout.includes('alice@example.com'));
@@ -101,7 +101,7 @@ test('CLI: inspect --hash prints only the hash', (t) => {
   t.regex(result.stdout.trim(), /^[a-f0-9]{64}$/i);
 });
 
-test('CLI: rehydrate emits warning to stderr for hallucinated placeholder', (t) => {
+test.serial('CLI: rehydrate emits warning to stderr for hallucinated placeholder', (t) => {
   const scrubRes = runCli(['scrub'], 'My secret is sk-1234567890abcdefghijklmno');
   const sessionIdMatch = scrubRes.stderr.match(/Session ID: (\S+)/);
   const sessionId = sessionIdMatch![1]!;
@@ -126,7 +126,7 @@ test.serial('CLI: sessions list shows empty state', (t) => {
   t.true(result.stdout.includes('No saved sessions.'));
 });
 
-test('CLI: sessions commands manage state', (t) => {
+test.serial('CLI: sessions commands manage state', (t) => {
   // Setup: create a session
   const scrubRes = runCli(['scrub'], 'Contact me at alice@example.com');
   const sessionIdMatch = scrubRes.stderr.match(/Session ID: (\S+)/);
@@ -154,26 +154,26 @@ test('CLI: sessions commands manage state', (t) => {
   t.true(showGoneRes.stderr.includes('not found'));
 });
 
-test('CLI: scrub fails when input file does not exist', (t) => {
+test.serial('CLI: scrub fails when input file does not exist', (t) => {
   const result = runCli(['scrub', 'non-existent-file-123.txt']);
   t.not(result.status, 0);
   t.true(result.stderr.includes('Error reading file') && result.stderr.includes('ENOENT'));
 });
 
-test('CLI: scrub fails when reading from stdin with no input provided', (t) => {
+test.serial('CLI: scrub fails when reading from stdin with no input provided', (t) => {
   // Pass an empty string as input
   const result = runCli(['scrub'], '');
   t.is(result.status, 0); // Actually scrub.ts says process.exit(0) if !input
   t.is(result.stdout, '');
 });
 
-test('CLI: sessions show fails with invalid session id', (t) => {
+test.serial('CLI: sessions show fails with invalid session id', (t) => {
   const result = runCli(['sessions', 'show', 'invalid-id-xyz']);
   t.not(result.status, 0);
   t.true(result.stderr.includes('not found'));
 });
 
-test('CLI: sessions rm --all handles empty sessions gracefully', (t) => {
+test.serial('CLI: sessions rm --all handles empty sessions gracefully', (t) => {
   // Clear the dir first
   const sessionsDir = path.join(tmpConfigDir, 'prompt-scrub', 'sessions');
   if (fs.existsSync(sessionsDir)) {
@@ -184,7 +184,7 @@ test('CLI: sessions rm --all handles empty sessions gracefully', (t) => {
   t.true(result.stdout.includes('No sessions to remove.'));
 });
 
-test('CLI: sessions rm --all successfully removes multiple sessions', (t) => {
+test.serial('CLI: sessions rm --all successfully removes multiple sessions', (t) => {
   runCli(['scrub'], 'Contact alice@example.com');
   runCli(['scrub'], 'Contact bob@example.com');
 
@@ -192,38 +192,66 @@ test('CLI: sessions rm --all successfully removes multiple sessions', (t) => {
   t.is(result.status, 0);
   t.true(result.stdout.includes('Deleted 2 sessions.'));
 });
+test.serial('CLI: sessions gc garbage collects expired sessions', (t) => {
+  // Clear the dir first
+  const sessionsDir = path.join(tmpConfigDir, 'prompt-scrub', 'sessions');
+  if (fs.existsSync(sessionsDir)) {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
 
-test('CLI: rehydrate fails when input file does not exist', (t) => {
+  // Create two sessions
+  const scrub1 = runCli(['scrub'], 'Contact old@example.com');
+  const scrub2 = runCli(['scrub'], 'Contact new@example.com');
+  
+  const id1 = scrub1.stderr.match(/Session ID: ([\w-]+)/)?.[1];
+  const id2 = scrub2.stderr.match(/Session ID: ([\w-]+)/)?.[1];
+  
+  if (!id1 || !id2) return t.fail('Failed to extract session IDs');
+
+  // Age the first session by 10 days
+  const oldPath = path.join(sessionsDir, `${id1}.json`);
+  const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+  fs.utimesSync(oldPath, tenDaysAgo, tenDaysAgo);
+
+  const result = runCli(['sessions', 'gc']);
+  t.is(result.status, 0);
+  t.true(result.stdout.includes('Deleted 1 expired session(s).'));
+  
+  t.false(fs.existsSync(oldPath));
+  t.true(fs.existsSync(path.join(sessionsDir, `${id2}.json`)));
+});
+
+test.serial('CLI: rehydrate fails when input file does not exist', (t) => {
   const result = runCli(['rehydrate', '--session-id', 'test-id', 'non-existent-file-123.txt']);
   t.not(result.status, 0);
   t.true(result.stderr.includes('Error reading file'));
 });
 
-test('CLI: rehydrate fails when reading from stdin with no input provided', (t) => {
+test.serial('CLI: rehydrate fails when reading from stdin with no input provided', (t) => {
   const result = runCli(['rehydrate', '--session-id', 'test-id'], '');
   t.is(result.status, 0);
   t.is(result.stdout, '');
 });
 
-test('CLI: inspect fails when input file does not exist', (t) => {
+test.serial('CLI: inspect fails when input file does not exist', (t) => {
   const result = runCli(['inspect', 'non-existent-file-123.txt']);
   t.not(result.status, 0);
   t.true(result.stderr.includes('Error reading file'));
 });
 
-test('CLI: inspect fails when reading from stdin with no input provided', (t) => {
+test.serial('CLI: inspect fails when reading from stdin with no input provided', (t) => {
   const result = runCli(['inspect'], '');
   t.is(result.status, 0);
   t.is(result.stdout, '');
 });
 
-test('CLI: sessions rm fails when session ID is missing without --all', (t) => {
+test.serial('CLI: sessions rm fails when session ID is missing without --all', (t) => {
   const result = runCli(['sessions', 'rm']);
   t.not(result.status, 0);
   t.true(result.stderr.includes("missing required argument 'id'"));
 });
 
-test('CLI: sessions rm fails gracefully with invalid session id', (t) => {
+test.serial('CLI: sessions rm fails gracefully with invalid session id', (t) => {
   const result = runCli(['sessions', 'rm', 'invalid-id-xyz']);
   t.not(result.status, 0);
   t.true(result.stderr.includes('not found'));

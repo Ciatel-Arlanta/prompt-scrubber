@@ -4,6 +4,7 @@ import { loadConfig } from '../../core/config.js';
 
 import { loadConfiguredRulePacks } from '../../core/rule-packs.js';
 import { scrub } from '../../core/scrub.js';
+import { gcSessions } from '../../session/storage.js';
 import type { ScrubStats } from '../../types/index.js';
 
 export async function handleScrub(
@@ -28,6 +29,13 @@ export async function handleScrub(
     : [];
 
   const config = loadConfig();
+
+  try {
+    gcSessions(config.sessionTtlDays ?? 7);
+  } catch (e) {
+    console.error(`Warning: Failed to run session garbage collection: ${(e as Error).message}`);
+  }
+
   const urlAllowlist = Array.from(new Set([...(config.urlAllowlist || []), ...cliUrlAllowlist]));
 
   const { detectors: rulePackDetectors } = await loadConfiguredRulePacks();

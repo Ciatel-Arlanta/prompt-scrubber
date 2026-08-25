@@ -99,7 +99,10 @@ Lists all known session IDs currently stored on disk along with their file sizes
 Prints the raw JSON contents of a session map for inspection or manual editing.
 
 ### `prompt-scrub sessions rm <id>`
-Deletes a session map from the disk permanently.
+Deletes a session map from the disk permanently. Use the `--all` option to delete all sessions.
+
+### `prompt-scrub sessions gc`
+Manually cleans up expired sessions based on the `sessionTtlDays` configuration. (By default, expired sessions are automatically pruned when you run `scrub` or `sessions list`.)
 
 ## Configuration
 
@@ -116,12 +119,14 @@ The generated file documents the supported schema:
 ```json
 {
   "rulePacks": [],
-  "urlAllowlist": []
+  "urlAllowlist": [],
+  "sessionTtlDays": 7
 }
 ```
 
 - `rulePacks`: npm package names to load extra detectors from. See [Authoring Rule Packs](../features/authoring-rule-packs.md).
 - `urlAllowlist`: hostnames the `UrlDetector` passes through unchanged. Subdomains are implicitly allowed.
+- `sessionTtlDays`: number of days after which inactive sessions are automatically garbage collected. Default is 7.
 
 Fails if a config file already exists.
 

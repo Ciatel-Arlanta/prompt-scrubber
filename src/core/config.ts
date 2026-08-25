@@ -5,6 +5,7 @@ import * as path from 'node:path';
 export interface PromptScrubConfig {
   rulePacks?: string[];
   urlAllowlist?: string[];
+  sessionTtlDays?: number;
 }
 
 export interface ConfigFileState {
@@ -18,6 +19,7 @@ export function createDefaultConfig(): Required<PromptScrubConfig> {
   return {
     rulePacks: [],
     urlAllowlist: [],
+    sessionTtlDays: 7,
   };
 }
 
@@ -85,6 +87,13 @@ function validateConfig(data: unknown): string[] {
     const value = record[key];
     if (value === undefined) continue;
 
+    if (key === 'sessionTtlDays') {
+      if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+        errors.push(`"${key}" must be a positive number, received ${describeType(value)}.`);
+      }
+      continue;
+    }
+
     if (!Array.isArray(value)) {
       errors.push(`"${key}" must be an array of strings, received ${describeType(value)}.`);
     } else if (value.some((item) => typeof item !== 'string')) {
@@ -125,6 +134,12 @@ export function readConfigFile(): ConfigFileState {
     config: {
       rulePacks: toStringArray(record.rulePacks),
       urlAllowlist: toStringArray(record.urlAllowlist),
+      sessionTtlDays:
+        typeof record.sessionTtlDays === 'number' &&
+        Number.isFinite(record.sessionTtlDays) &&
+        record.sessionTtlDays > 0
+          ? record.sessionTtlDays
+          : 7,
     },
   };
 }

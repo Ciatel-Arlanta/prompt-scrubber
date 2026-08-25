@@ -30,7 +30,7 @@ Sessions are stored as JSON files on disk in the user's config directory:
 ## Lifecycle & Expiry
 
 - **Creation**: Sessions are created on-demand. If no session ID is provided to the CLI or the API, a new one is generated.
-- **Duration**: By default, there is no automatic expiry in v1. The user explicitly controls when sessions are removed via the `prompt-scrub sessions rm <id>` command.
+- **Duration**: By default, sessions automatically expire after 7 days of inactivity. This is configurable via the `sessionTtlDays` option in the config file. Expired sessions are automatically pruned during regular operations, or manually via `prompt-scrub sessions gc`. Users can also explicitly remove sessions via the `prompt-scrub sessions rm <id>` command.
 - **Duplicates**: If a session ID already exists, the manager loads it and appends new identifiers. Existing identifiers maintain their previously assigned placeholder mappings. If the same value is encountered again (e.g., "john@example.com"), the system reuses `Email_1` instead of creating `Email_2`.
 
 ## ID Generation
