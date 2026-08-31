@@ -321,3 +321,51 @@ test('stats include categories contributed by custom detectors', (t) => {
   t.is(result.stats.totalEntities, 2);
   t.deepEqual(result.stats.byCategory, { Ticket: 1, Email: 1 });
 });
+
+test('ip address scrubbing and round-tripping works correctly', (t) => {
+  const original = 'Server at 192.168.1.1 and ipv6 2001:db8::1';
+  const scrubResult = scrub({ content: original });
+  t.is(scrubResult.scrubbedContent, 'Server at «IpAddress_2» and ipv6 «IpAddress_1»');
+
+  const rehydrated = rehydrate({
+    content: scrubResult.scrubbedContent,
+    sessionMap: scrubResult.sessionMap,
+  });
+  t.is(rehydrated.content, original);
+});
+
+test('credit card scrubbing and round-tripping works correctly', (t) => {
+  const original = 'Visa: 4532-0150-0000-0007, Amex: 3782 822463 10005';
+  const scrubResult = scrub({ content: original });
+  t.is(scrubResult.scrubbedContent, 'Visa: «CreditCard_2», Amex: «CreditCard_1»');
+
+  const rehydrated = rehydrate({
+    content: scrubResult.scrubbedContent,
+    sessionMap: scrubResult.sessionMap,
+  });
+  t.is(rehydrated.content, original);
+});
+
+test('ssn scrubbing and round-tripping works correctly', (t) => {
+  const original = 'User SSN is 123-45-6789.';
+  const scrubResult = scrub({ content: original });
+  t.is(scrubResult.scrubbedContent, 'User SSN is «Ssn_1».');
+
+  const rehydrated = rehydrate({
+    content: scrubResult.scrubbedContent,
+    sessionMap: scrubResult.sessionMap,
+  });
+  t.is(rehydrated.content, original);
+});
+
+test('iban scrubbing and round-tripping works correctly', (t) => {
+  const original = 'Wire to GB82 WEST 1234 5698 7654 32 today';
+  const scrubResult = scrub({ content: original });
+  t.is(scrubResult.scrubbedContent, 'Wire to «Iban_1» today');
+
+  const rehydrated = rehydrate({
+    content: scrubResult.scrubbedContent,
+    sessionMap: scrubResult.sessionMap,
+  });
+  t.is(rehydrated.content, original);
+});
