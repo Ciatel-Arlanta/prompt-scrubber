@@ -39,6 +39,10 @@ export interface Detector {
 - `PathDetector`: Detects absolute paths and home directories.
 - `SecretDetector`: Detects high-entropy strings, API keys, and tokens.
 - `AddressDetector`: Detects unambiguous postal addresses (e.g., street shapes).
+- `CreditCardDetector`: Detects 16-digit (Visa, Mastercard, Discover) and 15-digit (American Express) card numbers, validated with the Luhn (Mod-10) checksum so barcodes and serial numbers are rejected.
+- `IbanDetector`: Detects International Bank Account Numbers, validated against the ISO 13616 country registry (code and exact length) and the ISO 7064 MOD-97 checksum.
+- `SsnDetector`: Detects US Social Security Numbers with SSA structural rules (area != 000/666/9xx, group != 00, serial != 0000). The hyphenated `AAA-GG-SSSS` form matches on its own; the space-separated and continuous forms require a nearby `SSN` / `social security` / `tax id` label, because a bare 9-digit run is more often an order ID or error code.
+- `IpAddressDetector`: Detects IPv4 (with strict 0-255 octet bounds and an optional CIDR suffix) and IPv6 addresses in full and compressed notation.
 
 ### Opt-in Detectors (Off by Default)
 
@@ -51,13 +55,17 @@ When multiple detectors flag overlapping spans, a collision resolution system de
 
 Priority is implicitly handled by a defined order of precedence:
 1. `SecretDetector` (highest priority - missing a secret is dangerous)
-2. `EmailDetector`
-3. `UrlDetector`
-4. `PathDetector`
-5. `PhoneDetector`
-6. `AddressDetector`
-7. `NameDetector`
-8. `CodeTellDetector`
+2. `CreditCardDetector`
+3. `IbanDetector`
+4. `SsnDetector`
+5. `EmailDetector`
+6. `UrlDetector`
+7. `PathDetector`
+8. `IpAddressDetector`
+9. `PhoneDetector`
+10. `AddressDetector`
+11. `NameDetector`
+12. `CodeTellDetector`
 
 If `SecretDetector` and `UrlDetector` match the same string (e.g., a URL with a token), `SecretDetector` wins.
 
