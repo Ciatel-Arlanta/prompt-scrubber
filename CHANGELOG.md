@@ -1,5 +1,16 @@
 # @nanocollective/prompt-scrub
 
+# 1.4.0
+
+- feat: encrypt local session files at rest
+
+Adds AES-256-GCM with scrypt-derived keys for session files on disk, plus a
+new `sessions encrypt` command for migrating existing plaintext sessions.
+Keys are supplied through `PROMPT_SCRUB_KEY`, an interactive TTY prompt, or
+the new `setCachedEncryptionKey()` API for library users. A typed
+`SessionDecryptionError` distinguishes "wrong key" / "tampered file" from
+the historical silent-quarantine behaviour.
+
 # 1.3.0
 
 - Add --json flag to scrub, inspect, and rehydrate CLI commands for machine-readable output in CI/CD pipelines and scripts. Also fixes inspect's placeholder numbering to match actual scrub output (right-to-left replacement with per-value deduplication); inspect text and JSON output now show the same placeholders scrub will produce.
