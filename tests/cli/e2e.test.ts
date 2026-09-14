@@ -384,7 +384,7 @@ test.serial('CLI: rehydrate --json returns restored content', (t) => {
   };
 
   t.is(output.content, 'Contact alice@example.com');
-  t.is(output.sessionId, sessionId);
+  t.is(output.sessionId, sessionId!);
   t.deepEqual(output.warnings, []);
 });
 
@@ -532,7 +532,7 @@ test.serial('CLI: scrub --json works with file argument', (t) => {
 });
 
 test.serial('CLI: inspect --json works with file argument', (t) => {
-  const tmpFile = path.join(tmpConfigDir, 'test-inspect.txt');
+  const tmpFile = path.join(tmpFilesDir, 'test-inspect.txt');
   fs.mkdirSync(path.dirname(tmpFile), { recursive: true });
   fs.writeFileSync(tmpFile, 'Contact alice@example.com');
 
@@ -549,6 +549,55 @@ test.serial('CLI: inspect --json works with file argument', (t) => {
   t.is(output.entities[0]?.value, 'alice@example.com');
 
   fs.unlinkSync(tmpFile);
+});
+
+test.serial('CLI: rehydrate --json works with file argument', (t) => {
+  const scrubRes = runCli(['scrub', '--json'], 'Contact alice@example.com');
+  t.is(scrubRes.status, 0);
+
+  const { content, sessionId } = JSON.parse(scrubRes.stdout) as {
+    content: string;
+    sessionId: string;
+  };
+
+  const tmpFile = path.join(tmpFilesDir, 'test-rehydrate.txt');
+  fs.mkdirSync(path.dirname(tmpFile), { recursive: true });
+  fs.writeFileSync(tmpFile, content);
+
+  const rehydrateRes = runCli(['rehydrate', '--session-id', sessionId, '--json', tmpFile]);
+  t.is(rehydrateRes.status, 0);
+
+  const { content: restored, warnings } = JSON.parse(rehydrateRes.stdout) as {
+    content: string;
+    warnings: string[];
+  };
+  t.is(restored, 'Contact alice@example.com');
+  t.deepEqual(warnings, []);
+
+  fs.unlinkSync(tmpFile);
+});
+
+test.serial('CLI: rehydrate --json reports hallucinated placeholders in warnings array', (t) => {
+  const scrubRes = runCli(['scrub', '--json'], 'Contact alice@example.com');
+  t.is(scrubRes.status, 0);
+
+  const { sessionId } = JSON.parse(scrubRes.stdout) as {
+    sessionId: string;
+  };
+
+  const rehydrateRes = runCli(
+    ['rehydrate', '--session-id', sessionId, '--json'],
+    'Contact «Email_1» and hallucinated «Email_99»',
+  );
+  t.is(rehydrateRes.status, 0);
+
+  const output = JSON.parse(rehydrateRes.stdout) as {
+    content: string;
+    warnings: string[];
+  };
+  t.is(output.content, 'Contact alice@example.com and hallucinated «Email_99»');
+  t.is(output.warnings.length, 1);
+  t.true(output.warnings[0]?.includes('«Email_99»'));
 });
 
 test.serial('CLI: scrub --json file error goes to stderr with exit code 1', (t) => {
@@ -614,7 +663,10 @@ test.serial('CLI: inspect --json placeholders match actual scrub output', (t) =>
     entities: Array<{ placeholder: string }>;
   };
 
-  t.deepEqual(entities.map((e) => e.placeholder), scrubPlaceholders);
+  t.deepEqual(
+    entities.map((e) => e.placeholder),
+    scrubPlaceholders,
+  );
 });
 
 test.serial('CLI: scrub --json then rehydrate --json round trip', (t) => {
@@ -763,8 +815,14 @@ test('CLI: inspect --json with --min-confidence reports suppressed findings', (t
   };
 
   // The email survives the threshold; the phone is dropped from entities...
-  t.deepEqual(output.entities.map((e) => e.category), ['Email']);
+  t.deepEqual(
+    output.entities.map((e) => e.category),
+    ['Email'],
+  );
   // ...but is named as still in the clear rather than vanishing.
-  t.deepEqual(output.suppressed.map((s) => s.category), ['Phone']);
+  t.deepEqual(
+    output.suppressed.map((s) => s.category),
+    ['Phone'],
+  );
   t.regex(output.hash, /^[a-f0-9]{64}$/);
 });

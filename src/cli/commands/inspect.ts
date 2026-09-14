@@ -5,10 +5,10 @@ import { loadConfiguredRulePacks } from '../../core/rule-packs.js';
 import { getActiveDetectors, runDetectors } from '../../core/scrub.js';
 import { SessionManager } from '../../session/session-manager.js';
 import type { ScoredFinding } from '../../types/index.js';
-import { emitJson } from '../output.js';
 import { addDetectorOptions, readInput } from '../io.js';
-import { sanitizeLine } from '../sanitize.js';
 import { parseConfidence } from '../options.js';
+import { emitJson } from '../output.js';
+import { sanitizeLine } from '../sanitize.js';
 
 interface InspectJsonEntity {
   category: string;

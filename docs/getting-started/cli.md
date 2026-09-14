@@ -247,9 +247,12 @@ All three commands emit their primary payload under `content`.
       "category": "Email",
       "value": "alice@example.com",
       "placeholder": "«Email_1»",
-      "span": [0, 20]
+      "span": [0, 20],
+      "confidence": 1.0,
+      "method": "regex"
     }
   ],
+  "suppressed": [],
   "hash": "sha256-hex-here"
 }
 ```
@@ -266,7 +269,7 @@ All three commands emit their primary payload under `content`.
 
 ### Errors (stdin/file read failures only)
 
-If a file cannot be read or stdin is unavailable, commands running with `--json` print a JSON error envelope to **stderr** and exit with code `1`. Success JSON is written to **stdout**, so `prompt-scrubber scrub --json | jq` never sees error text mixed into the pipe.
+If a file cannot be read or stdin is unavailable, commands running with `--json` print a JSON error envelope to **stderr** and exit with code `1`. Success JSON is written to **stdout**, so `prompt-scrub scrub --json | jq` never sees error text mixed into the pipe.
 
 ```json
 { "error": "message describing what went wrong" }

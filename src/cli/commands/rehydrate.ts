@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs';
 import type { Command } from 'commander';
 import { rehydrate } from '../../core/rehydrate.js';
-import { emitError, emitJson } from '../output.js';
+import { readInput } from '../io.js';
+import { emitJson } from '../output.js';
 
 export function handleRehydrate(text: string, options: { sessionId: string }) {
   const result = rehydrate({
@@ -19,29 +19,8 @@ export function setupRehydrateCommand(program: Command) {
     .requiredOption('--session-id <id>', 'Resume or target a specific session')
     .option('--json', 'Output a structured JSON object instead of plain text')
     .action((file, options) => {
-      let input = '';
-
-      if (file) {
-        try {
-          // Read from file
-          input = readFileSync(file, 'utf8');
-        } catch (err: unknown) {
-          const message = `Error reading file: ${(err as Error).message}`;
-          emitError(message, options.json);
-          process.exit(1);
-          return;
-        }
-      } else {
-        try {
-          // Read from stdin
-          input = readFileSync(0, 'utf-8');
-        } catch {
-          const message = 'No input provided.';
-          emitError(message, options.json);
-          process.exit(1);
-          return;
-        }
-      }
+      const input = readInput(file, options.json);
+      if (input === undefined) return;
       if (!input) {
         if (options.json) {
           const output = {
