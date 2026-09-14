@@ -334,6 +334,7 @@ test('CLI: config show reports a configured locale', (t) => {
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: 'de-DE',
+    encryptionEnabled: false,
   });
 });
 
@@ -351,6 +352,7 @@ test('CLI: config show rejects a malformed locale and ignores it at runtime', (t
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: '',
+    encryptionEnabled: false,
   });
 });
 
@@ -377,6 +379,7 @@ test('CLI: an empty locale is accepted without error', (t) => {
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: '',
+    encryptionEnabled: false,
   });
 });
 
