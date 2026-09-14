@@ -54,6 +54,7 @@ test('CLI: init creates a default config file and its parent directories', (t) =
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: '',
+    encryptionEnabled: false,
   });
 });
 
@@ -82,6 +83,7 @@ test('CLI: init --force overwrites an existing config file', (t) => {
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: '',
+    encryptionEnabled: false,
   });
 });
 
@@ -104,6 +106,7 @@ test('CLI: config show prints defaults and a hint when no config file exists', (
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: '',
+    encryptionEnabled: false,
   });
   t.true(result.stderr.includes('No config file at'));
   t.true(result.stderr.includes('prompt-scrub init'));
@@ -125,6 +128,7 @@ test('CLI: config show prints the active configuration and its path', (t) => {
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: '',
+    encryptionEnabled: false,
   });
   t.true(result.stderr.includes(path.join(configDir, 'config.json')));
 });
@@ -143,6 +147,7 @@ test('CLI: config show reports invalid JSON', (t) => {
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: '',
+    encryptionEnabled: false,
   });
 });
 
@@ -194,7 +199,11 @@ test('CLI: config show reports unknown keys', (t) => {
 
   t.is(result.status, 1);
   t.true(result.stderr.includes('Unknown key "rulePaks"'));
-  t.true(result.stderr.includes('rulePacks, urlAllowlist, minConfidence, sessionTtlDays, locale'));
+  t.true(
+    result.stderr.includes(
+      'rulePacks, urlAllowlist, minConfidence, sessionTtlDays, locale, encryptionEnabled',
+    ),
+  );
 });
 
 test('CLI: config show reports keys with the wrong type', (t) => {
@@ -222,6 +231,7 @@ test('CLI: config show reports non-string array members and drops them', (t) => 
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: '',
+    encryptionEnabled: false,
   });
 });
 
@@ -238,6 +248,7 @@ test('CLI: config show deduplicates repeated entries', (t) => {
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: '',
+    encryptionEnabled: false,
   });
 });
 
@@ -253,6 +264,7 @@ test('CLI: init output round-trips through config show', (t) => {
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: '',
+    encryptionEnabled: false,
   });
 });
 
@@ -322,6 +334,7 @@ test('CLI: config show reports a configured locale', (t) => {
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: 'de-DE',
+    encryptionEnabled: false,
   });
 });
 
@@ -339,6 +352,7 @@ test('CLI: config show rejects a malformed locale and ignores it at runtime', (t
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: '',
+    encryptionEnabled: false,
   });
 });
 
@@ -365,6 +379,7 @@ test('CLI: an empty locale is accepted without error', (t) => {
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: '',
+    encryptionEnabled: false,
   });
 });
 

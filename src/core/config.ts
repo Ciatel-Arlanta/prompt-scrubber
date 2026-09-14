@@ -9,6 +9,7 @@ export interface PromptScrubConfig {
   minConfidence?: number;
   sessionTtlDays?: number;
   locale?: string;
+  encryptionEnabled?: boolean;
 }
 
 export interface ConfigFileState {
@@ -26,6 +27,7 @@ export function createDefaultConfig(): Required<PromptScrubConfig> {
     minConfidence: 0,
     sessionTtlDays: 7,
     locale: '',
+    encryptionEnabled: false,
   };
 }
 
@@ -61,6 +63,10 @@ const VALIDATORS: Record<ConfigKey, (value: unknown) => string | null> = {
     }
     return null;
   },
+  encryptionEnabled: (value) =>
+    typeof value === 'boolean'
+      ? null
+      : `"encryptionEnabled" must be a boolean, received ${describeType(value)}.`,
 };
 
 const CONFIG_KEYS = Object.keys(VALIDATORS) as ConfigKey[];
@@ -193,6 +199,8 @@ export function readConfigFile(): ConfigFileState {
           ? record.sessionTtlDays
           : 7,
       locale: toLocale(record.locale),
+      encryptionEnabled:
+        typeof record.encryptionEnabled === 'boolean' ? record.encryptionEnabled : false,
     },
   };
 }

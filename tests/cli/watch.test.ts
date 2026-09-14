@@ -424,6 +424,65 @@ test('handleWatch registers a SIGINT handler that clears the timer and stops', a
   }
 });
 
+test.serial(
+  'handleWatch resolves the encryption key once before the loop when encryption is enabled',
+  async (t) => {
+    const filePath = path.join(tmpDir, 'encrypted-watch.txt');
+    fs.writeFileSync(filePath, 'My email is alice@example.com', 'utf8');
+
+    // Write a config that turns on encryption. Without the key being
+    // resolved up-front the first tick would throw SessionDecryptionError
+    // mid-loop.
+    const configPath = path.join(tmpDir, 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ encryptionEnabled: true }));
+    process.env.PROMPT_SCRUB_KEY = 'watch-encryption-key';
+
+    let resolveCount = 0;
+    await handleWatch({
+      file: filePath,
+      once: true,
+      logFn: () => {},
+      notifyFn: () => {},
+      resolveEncryptionKey: () => {
+        resolveCount += 1;
+        return Promise.resolve(true);
+      },
+    });
+
+    t.is(resolveCount, 1, 'key resolver must run exactly once, before the loop');
+
+    delete process.env.PROMPT_SCRUB_KEY;
+    fs.rmSync(configPath);
+  },
+);
+
+test.serial(
+  'handleWatch does not call the resolver when encryption is disabled and the session is plaintext',
+  async (t) => {
+    const filePath = path.join(tmpDir, 'plain-watch.txt');
+    fs.writeFileSync(filePath, 'My email is bob@example.com', 'utf8');
+
+    const configPath = path.join(tmpDir, 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ encryptionEnabled: false }));
+
+    let resolveCount = 0;
+    await handleWatch({
+      file: filePath,
+      once: true,
+      logFn: () => {},
+      notifyFn: () => {},
+      resolveEncryptionKey: () => {
+        resolveCount += 1;
+        return Promise.resolve(true);
+      },
+    });
+
+    t.is(resolveCount, 0, 'resolver must not run when nothing needs encryption');
+
+    fs.rmSync(configPath);
+  },
+);
+
 test('a repeated value is counted once per replacement, not once per placeholder', async (t) => {
   // Documented behaviour change. The tick summary is now driven by that
   // scrub's stats, which count findings, rather than by the session map, which

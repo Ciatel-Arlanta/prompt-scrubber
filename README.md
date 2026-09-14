@@ -94,6 +94,35 @@ echo "My email is user@example.com" | prompt-scrub scrub
 echo "My email is user@example.com" | prompt-scrub scrub --min-confidence 0.9
 ```
 
+**CLI: Encrypting session files at rest**
+
+Local session files map placeholders like `«Secret_1»` back to your real secrets. If your laptop is stolen or another process on your account reads `~/.config/prompt-scrub/sessions/`, those secrets leak. Enable encryption to keep them protected on disk:
+
+```json
+// ~/.config/prompt-scrub/config.json
+{ "encryptionEnabled": true }
+```
+
+Then pass a passphrase via the `PROMPT_SCRUB_KEY` environment variable when running `scrub`/`rehydrate`/`sessions`:
+
+```bash
+# Read your passphrase from a secret manager; do NOT echo it inline — it will
+# land in your shell history.
+export PROMPT_SCRUB_KEY
+read -rs PROMPT_SCRUB_KEY   # enter interactively
+echo "sk-1234567890abcdefghij" | prompt-scrub scrub
+```
+
+If `PROMPT_SCRUB_KEY` is unset and `stdin` is a TTY, `prompt-scrub` will prompt for the passphrase interactively (with input muted). Rehydrate on an encrypted session also requires the same key.
+
+> Note: `prompt-scrub` only reads the file `rehydrate` was asked about. If you only ever use `scrub`, the *output* (the scrubbed prompt) is safe to send anywhere regardless of encryption; encryption protects the *session file* on disk.
+
+To migrate existing plaintext sessions after enabling encryption:
+
+```bash
+PROMPT_SCRUB_KEY=… prompt-scrub sessions encrypt
+```
+
 **CLI: Watch clipboard**
 ```bash
 # Monitor clipboard and automatically scrub sensitive data
@@ -120,26 +149,33 @@ export OPENAI_BASE_URL=http://localhost:8080/v1
 
 See the [CLI Reference](docs/getting-started/cli.md#proxy-mode) for the full set of options and supported providers.
 
-**Node.js API: Scrubbing and Rehydrating**
+**Node.js API: Scrubbing, Rehydrating, and Key Injection**
 ```typescript
-import { scrub, rehydrate } from '@nanocollective/prompt-scrub';
+import {
+  scrub,
+  rehydrate,
+  setCachedEncryptionKey,
+} from '@nanocollective/prompt-scrub';
+
+// Optional: inject a key without relying on PROMPT_SCRUB_KEY / TTY prompting.
+setCachedEncryptionKey(process.env.MY_APP_KEY ?? '');
 
 const prompt = "My key is sk-12345";
 const { scrubbedContent, sessionId } = scrub({ content: prompt });
-console.log(scrubbedContent); // "My key is Secret_1"
+console.log(scrubbedContent); // "My key is «Secret_1»"
 
-// ... send to LLM ... get response "I see your key is Secret_1"
+// ... send to LLM ... get response "I see your key is «Secret_1»"
 
-const { content } = rehydrate({ 
-  content: "I see your key is Secret_1", 
-  sessionId 
+const { content } = rehydrate({
+  content: "I see your key is «Secret_1»",
+  sessionId,
 });
 console.log(content); // "I see your key is sk-12345"
 ```
 
 ## Configuration
 
-`prompt-scrub` reads an optional config file for extra rule packs, URL allowlisting, the active locale, and a default confidence floor. Create one pre-filled with the default schema:
+`prompt-scrub` reads an optional config file for extra rule packs, URL allowlisting, the active locale, a default confidence floor, session TTL, and encryption. Create one pre-filled with the default schema:
 
 ```bash
 prompt-scrub init
@@ -170,9 +206,13 @@ prompt-scrub sessions gc
 To configure the TTL, add `sessionTtlDays` to your `~/.config/prompt-scrub/config.json`:
 ```json
 {
-  "sessionTtlDays": 14
+  "sessionTtlDays": 14,
+  "encryptionEnabled": true
 }
 ```
+
+Once `encryptionEnabled` is on, run `prompt-scrub sessions encrypt` (passing `PROMPT_SCRUB_KEY`) to rewrite any plaintext sessions already on disk.
+
 ## Documentation
 
 Full user guides and architecture details are in the [`docs/`](docs/) directory:
