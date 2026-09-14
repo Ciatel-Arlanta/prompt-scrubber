@@ -6,7 +6,7 @@ sidebar_order: 1
 
 # CLI Reference
 
-The `prompt-scrub` package provides a command-line interface for manual inspection, scripting, and pipeline integration. 
+The `prompt-scrub` package provides a command-line interface for manual inspection, scripting, and pipeline integration.
 
 ## Core Commands
 
@@ -28,7 +28,11 @@ The summary counts replacements, not unique values: a value that appears three t
 **Options:**
 - `--session-id <id>`: Reuse an existing session map. If omitted, a new UUID is generated.
 - `--disable <detectors>`: Comma-separated list of detectors to disable (e.g. `EmailDetector,PhoneDetector`).
-- `-q, --quiet`: Suppress the summary. The `Session ID:` line is still printed, since scripts need it to rehydrate.
+- `--locale <locale>`: BCP-47 tag (e.g. `de-DE`) that activates detectors scoped to that locale. Overrides `locale` in the configuration file. A malformed tag exits `1`; a well-formed tag that activates no detector warns on `stderr`, so a missing rule pack is never mistaken for a completed locale scrub.
+- `--min-confidence <value>`: Discard findings scored below this confidence (`0`-`1`). Defaults to the configured `minConfidence`, or `0` (keep everything). Whatever the threshold discards is named in the summary, so a filtered run never quietly under-redacts. See [Confidence & Tiered Detection](../features/detectors.md#confidence--tiered-detection).
+- `-q, --quiet`: Suppress the summary. The `Session ID:` line is still printed, since scripts need it to rehydrate. A `--min-confidence` suppression notice is still printed too — `-q` is exactly the automated-workflow path that flag targets, so it must not be what hides what got dropped.
+- `--json`: Output result as structured JSON instead of text.
+- `--include-session-map`: Include `sessionMap` in JSON output (requires `--json`; contains sensitive values in plaintext — with this flag, raw values are written to stdout and will end up in CI logs).
 
 ### `prompt-scrub rehydrate [file]`
 Reads a scrubbed response from `stdin` or a file and prints the rehydrated response to `stdout`.
@@ -38,13 +42,56 @@ If the model hallucinates a placeholder that does not exist in the session map (
 
 **Options:**
 - `--session-id <id>` (Required): The session ID used during the `scrub` phase to restore original values.
+- `--json`: Output result as structured JSON instead of text.
 
 ### `prompt-scrub inspect [file]`
-Reads a message from `stdin` or a file and prints a human-readable diff of the transformations the scrubber will apply. Also prints a SHA-256 hash of the final byte-stable output for verifying prompt cache deterministic prefix stability.
+Reads a message from `stdin` or a file and prints a table of detected entities (category, value, placeholder, span). Also prints a SHA-256 hash of the final byte-stable output for verifying prompt cache deterministic prefix stability.
+
+Every entity is listed with the confidence the detector assigned it and the method
+that produced the match, so you can see what a `--min-confidence` threshold would
+drop before you commit to one:
+
+```bash
+$ echo "My email is alice@acme.com and I work at /Users/alice/projects." | prompt-scrub inspect
+Detected entities:
+  [Email]    alice@acme.com                   → «Email_1»  (chars 12-26, confidence 0.95 exact-pattern)
+  [Path]     /Users/alice/projects.           → «Path_1»   (chars 41-63, confidence 0.80 structural)
+```
 
 **Options:**
 - `--disable <detectors>`: Comma-separated list of detectors to disable.
+- `--enable <detectors>`: Comma-separated list of off-by-default detectors to enable (e.g. `NameDetector`).
+- `--strict-name`: Enable strict allowlisting for `NameDetector`.
+- `--code-tell-terms <terms>`: Comma-separated list of private identifiers to detect.
+- `--url-allowlist <hosts>`: Comma-separated list of hostnames to pass through.
+- `--locale <locale>`: BCP-47 tag that activates detectors scoped to that locale.
+- `--min-confidence <value>`: Hide findings scored below this confidence (`0`-`1`). Anything dropped is listed under a `Suppressed below --min-confidence <value>:` heading rather than silently disappearing. The printed hash reflects the filtered output, matching what `scrub` would produce at the same threshold.
 - `--hash`: Print *only* the SHA-256 hash for scripting purposes.
+- `--json`: Output result as structured JSON instead of text.
+
+### `prompt-scrub diff [file]`
+Reads a message from `stdin` or a file and prints a colorized line diff of the original text against what `scrub` would emit. Nothing is written to a session. Red lines are the original PII, green lines are the placeholders.
+
+```bash
+echo "Email me at alice@corp.com" | prompt-scrub diff --no-color
+```
+
+```
+- Email me at alice@corp.com
++ Email me at «Email_1»
+```
+
+Colors are on when stdout is a TTY. Pass `--no-color` or set `NO_COLOR` to pipe the output into a file.
+
+**Options:**
+- `--side-by-side`: Two-column layout (`original | scrubbed`). Long lines wrap; they are not truncated.
+- `--context <n>`: Unchanged lines kept around each change (default `3`). Must be a non-negative integer.
+- `--no-color`: Disable ANSI colors.
+- `--disable <detectors>`: Comma-separated list of detectors to disable.
+- `--enable <detectors>`: Comma-separated list of off-by-default detectors to enable (e.g. `NameDetector`).
+- `--strict-name`: Enable strict allowlisting for `NameDetector`.
+- `--code-tell-terms <terms>`: Comma-separated list of private identifiers to detect.
+- `--url-allowlist <hosts>`: Comma-separated list of hostnames to pass through.
 
 ## Watch Mode
 
@@ -64,6 +111,8 @@ prompt-scrub watch --file prompt.txt notes.md --interval 500
 prompt-scrub watch --file prompt.txt --dry-run --once
 ```
 
+A single session is used for the whole run, so placeholders keep counting up across ticks and two different values can never share one token. The session ID is printed on start-up (`[watch] Session ID: <id>`) - pass it to `prompt-scrub rehydrate --session-id <id>` to restore the originals. Use `--session-id` to keep watching into an existing session instead.
+
 Press `Ctrl-C` to stop watching; the poll loop is cleared and the process exits cleanly.
 
 **Options:**
@@ -79,6 +128,8 @@ Press `Ctrl-C` to stop watching; the poll loop is cleared and the process exits 
 - `--strict-name`: Enable strict allowlisting for `NameDetector`.
 - `--code-tell-terms <terms>`: Comma-separated list of private identifiers to detect.
 - `--url-allowlist <hosts>`: Comma-separated list of hostnames to pass through.
+- `--locale <locale>`: BCP-47 tag that activates detectors scoped to that locale, for this run only. Overrides `locale` in the configuration file. Validated once before the poll loop starts.
+- `--min-confidence <value>`: Discard findings scored below this confidence (`0`-`1`). Anything dropped is logged, including when it means the clipboard or file is left untouched.
 
 **Platform requirements:**
 
@@ -89,6 +140,54 @@ Watch mode shells out to a small platform helper for clipboard access and notifi
 | Windows | `powershell.exe` | `powershell.exe` |
 | macOS | `pbpaste` / `pbcopy` | `osascript` |
 | Linux | `xclip` | `notify-send` (`libnotify-bin`) |
+
+## Proxy Mode
+
+### `prompt-scrub proxy`
+
+Runs a local HTTP proxy that intercepts LLM API traffic and rewrites PII in-flight. Point any SDK at the proxy instead of the upstream API and every chat completion (streaming or otherwise) is scrubbed on the way out and rehydrated on the way back, transparently.
+
+```bash
+# Scrub + rehydrate OpenAI traffic on localhost:8080
+prompt-scrub proxy --target https://api.openai.com --port 8080 &
+
+# Now route your SDK through the proxy. Both work:
+export OPENAI_BASE_URL=http://localhost:8080/v1
+# or
+# point your HTTP client at http://localhost:8080 and add /v1 to your path
+```
+
+The proxy recognises two providers by URL shape:
+
+| Path pattern | Provider | Scrubbed fields |
+| --- | --- | --- |
+| `…/v1/chat/completions` | OpenAI | `messages[].content` (string or `text` parts) |
+| `…/v1/messages` | Anthropic | `messages[].content` (string or `text` blocks) |
+
+Anything that does not match a known shape (e.g. `GET /v1/models`, `POST /v1/embeddings`) is forwarded byte-for-byte without modification. This is the safe default: enabling a new vendor is additive.
+
+**Session continuity:** the proxy threads a session ID through every request via the `x-prompt-scrub-session` header. When the client sends the header back on a follow-up call, the same placeholder map is reused, so `«Email_1»` stays `«Email_1»` across turns. If the client does not send the header, the proxy generates a UUID and echoes it in the response so the client can pin it.
+
+**Streaming:** Server-Sent Events (SSE) are rehydrated incrementally. A placeholder may be split across chunks (`«Email_` then `1»`); the proxy buffers incomplete events so rehydration is lossless and reordering-safe. `data: [DONE]` sentinels and non-JSON payloads pass through untouched.
+
+**Headers:** the proxy strips hop-by-hop headers per RFC 7230 (`connection`, `keep-alive`, `transfer-encoding`, `upgrade`, `host`, etc.) and rewrites `host` to the upstream value. Authentication headers (`authorization`, `x-api-key`, etc.) are forwarded as-is.
+
+**Garbage collection:** on startup, expired sessions are pruned according to `sessionTtlDays`. Pass `--no-gc` to skip this.
+
+**Options:**
+- `--target <url>` (required): Upstream base URL, e.g. `https://api.openai.com` or `https://api.anthropic.com`.
+- `--port <port>`: Local port (default `8080`). Use `0` to bind a random free port.
+- `--host <host>`: Local interface to bind (default `127.0.0.1`).
+- `--disable <detectors>`, `--enable <detectors>`, `--strict-name`, `--code-tell-terms`, `--url-allowlist`: Same scrubber options as the `scrub` command.
+- `-v, --verbose`: Log a one-line summary of every proxied request to `stderr` (including the scrubbed/rehydrated counts and session ID).
+- `--no-gc`: Skip the startup session-garbage-collection pass.
+
+**Limitations:**
+
+- Request bodies larger than 10 MB are rejected with `413 Payload Too Large`. Tune with `maxBodyBytes` on the programmatic `ProxyOptions`.
+- Responses that arrive gzipped are forwarded uncompressed (we strip `accept-encoding` on the outbound hop). Upstreams that re-add gzip mid-flight are forwarded unchanged.
+- The proxy does not perform TLS termination for the inbound hop — terminate TLS at a reverse proxy if you need to expose it on a network interface. The default `127.0.0.1` binding is loopback-only.
+- The proxy is a development tool, not a hardened gateway. Run it on a trusted host.
 
 ## Session Management
 
@@ -170,14 +269,18 @@ The generated file documents the supported schema:
 {
   "rulePacks": [],
   "urlAllowlist": [],
+  "minConfidence": 0,
   "sessionTtlDays": 7,
+  "locale": "",
   "encryptionEnabled": false
 }
 ```
 
 - `rulePacks`: npm package names to load extra detectors from. See [Authoring Rule Packs](../features/authoring-rule-packs.md).
 - `urlAllowlist`: hostnames the `UrlDetector` passes through unchanged. Subdomains are implicitly allowed.
+- `minConfidence`: findings scored below this threshold are discarded. `0` keeps everything; `--min-confidence` overrides it per run.
 - `sessionTtlDays`: number of days after which inactive sessions are automatically garbage collected. Default is 7.
+- `locale`: BCP-47 tag (e.g. `de-DE`) enabling locale-scoped detectors. Empty means English/locale-agnostic detection only.
 - `encryptionEnabled`: when `true`, every session write is encrypted with AES-256-GCM using a passphrase read from `PROMPT_SCRUB_KEY` (or an interactive TTY prompt). See [Encryption at Rest](#encryption-at-rest) above.
 
 Fails if a config file already exists.
@@ -198,7 +301,9 @@ Config file: /home/alice/.config/prompt-scrub/config.json
   "urlAllowlist": [
     "example.com"
   ],
+  "minConfidence": 0.8,
   "sessionTtlDays": 7,
+  "locale": "de-DE",
   "encryptionEnabled": false
 }
 ```
@@ -208,11 +313,13 @@ Entries that do not match the schema are reported on `stderr` and the command ex
 ```bash
 $ prompt-scrub config show
 Config file: /home/alice/.config/prompt-scrub/config.json
-  error: Unknown key "rulePaks". Supported keys: rulePacks, urlAllowlist, sessionTtlDays, encryptionEnabled.
+  error: Unknown key "rulePaks". Supported keys: rulePacks, urlAllowlist, minConfidence, sessionTtlDays, locale, encryptionEnabled.
 {
   "rulePacks": [],
   "urlAllowlist": [],
+  "minConfidence": 0,
   "sessionTtlDays": 7,
+  "locale": "",
   "encryptionEnabled": false
 }
 Invalid entries are ignored at runtime.
@@ -225,3 +332,55 @@ Prints the current version of the CLI.
 
 ### `prompt-scrub --help`
 Prints standard help documentation and available commands.
+
+## JSON Output Formats
+All three commands emit their primary payload under `content`.
+
+### scrub --json
+```json
+{
+  "content": "Email «Email_1» and «Email_2»",
+  "sessionId": "uuid-here",
+  "stats": {
+    "totalEntities": 2,
+    "byCategory": { "Email": 2 }
+  }
+}
+```
+`sessionId` is present only when something was scrubbed and a session was persisted — it is omitted (not empty) otherwise. `sessionMap` appears only when `--include-session-map` is passed, and contains the original sensitive values in plaintext: with that flag, raw PII is written to stdout and will end up in CI logs.
+
+### inspect --json
+```json
+{
+  "entities": [
+    {
+      "category": "Email",
+      "value": "alice@example.com",
+      "placeholder": "«Email_1»",
+      "span": [0, 20],
+      "confidence": 1.0,
+      "method": "regex"
+    }
+  ],
+  "suppressed": [],
+  "hash": "sha256-hex-here"
+}
+```
+### rehydrate --json
+```json
+{
+  "content": "Email alice@example.com and bob@example.com",
+  "sessionId": "uuid-here",
+  "warnings": []
+}
+```
+
+`warnings` is returned by `rehydrate` only, since it is the only command that can produce them.
+
+### Errors (stdin/file read failures only)
+
+If a file cannot be read or stdin is unavailable, commands running with `--json` print a JSON error envelope to **stderr** and exit with code `1`. Success JSON is written to **stdout**, so `prompt-scrub scrub --json | jq` never sees error text mixed into the pipe.
+
+```json
+{ "error": "message describing what went wrong" }
+```

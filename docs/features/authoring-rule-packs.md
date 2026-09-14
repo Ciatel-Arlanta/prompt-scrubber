@@ -27,13 +27,25 @@ export interface Finding {
   span: [number, number]; // [startIndex, endIndex]
   value: string;
   placeholderPrefix: string;
+  confidence?: number; // Optional. How certain this match is, 0.0-1.0
+  method?: string; // Optional. How the match was made, e.g. 'exact-pattern'
 }
 
 export interface Detector {
   name: string; // A unique name for your detector
+  locales?: string[]; // Optional BCP-47 tags this detector applies to
   detect(text: string): Finding[];
 }
 ```
+
+`confidence` and `method` are optional. A finding that omits them is scored at
+`DEFAULT_CONFIDENCE` (0.5) with the method `unspecified`, so a pack written
+before these fields existed keeps working unchanged. Set them if your detector
+mixes exact patterns with weaker heuristics: users can then filter your findings
+with `--min-confidence`. See [Confidence & Tiered Detection](./detectors.md#confidence--tiered-detection)
+for the scores the built-in detectors use.
+
+`placeholderPrefix` may be any string that does not contain `«`, `»`, or whitespace — digits and underscores are fine, so `Ticket2` and `Jira_Issue` both work. The engine mints `«<prefix>_<n>»`, recognises that shape when reserving tokens already present in the text, and matches it again on rehydration, so a prefix outside that rule would produce a placeholder that never round-trips (and a prefix containing whitespace risks the reservation/rehydration regex misreading ordinary quoted text as a placeholder).
 
 > **Note to Whitepaper Readers:** 
 > The original whitepaper conceptually defines a `Finding` as `{ category, span, replacement }`. The canonical runtime interface explicitly omits `replacement` because the exact placeholder (e.g. `Email_2`) requires session state, which detectors do not have. Rule-pack authors must return `value` and `placeholderPrefix`, allowing the core engine to deterministically generate the final replacement.
@@ -70,6 +82,8 @@ Let's build a rule pack that detects "Project X" codenames.
            span: [match.index, match.index + match[0].length],
            value: match[0],
            placeholderPrefix: 'Codename',
+           confidence: 0.95, // An exact codename match; users can filter on this
+           method: 'exact-pattern',
          });
        }
 
@@ -94,7 +108,9 @@ Let's build a rule pack that detects "Project X" codenames.
    ```json
    {
      "rulePacks": ["prompt-scrub-projectx"],
-     "urlAllowlist": []
+     "urlAllowlist": [],
+     "minConfidence": 0,
+     "locale": ""
    }
    ```
 
@@ -109,9 +125,72 @@ Let's build a rule pack that detects "Project X" codenames.
    ProjectXDetector   rule-pack: prompt-scrub-projectx     on
    ```
 
+## Locale-Scoped Rule Packs
+
+The built-in detectors are shaped around English and US/UK formats, so locale-specific PII is best distributed as its own rule pack. A detector that declares `locales` only runs when the user has that locale active, which keeps the default path free of regexes nobody in that locale needs.
+
+```javascript
+class GermanAddressDetector {
+  constructor() {
+    this.name = 'AddressDeDetector';
+    this.locales = ['de-DE'];
+    this.regex = /[A-ZÄÖÜ][a-zäöüß]+(?:straße|str\.)\s+\d{1,4}/g;
+  }
+
+  detect(text) {
+    const findings = [];
+    let match;
+    this.regex.lastIndex = 0;
+
+    while ((match = this.regex.exec(text)) !== null) {
+      findings.push({
+        category: 'Address',
+        span: [match.index, match.index + match[0].length],
+        value: match[0],
+        placeholderPrefix: 'Address',
+      });
+    }
+
+    return findings;
+  }
+}
+```
+
+Users activate it per run or per machine:
+
+```bash
+$ prompt-scrub scrub --locale de-DE prompt.txt
+```
+
+```json
+{
+  "rulePacks": ["@nanocollective/prompt-scrub-locale-de"],
+  "locale": "de-DE"
+}
+```
+
+`--locale` overrides the configured `locale`. Matching is case-insensitive and works across subtag levels: a pack declaring `de` serves `de-DE` and `de-AT`, and a pack declaring `de-DE` is activated by a `de` request. A pack declaring `de-DE` is *not* activated by `de-AT`. Detectors that omit `locales` are locale-agnostic and always run.
+
+`locales` must be an array of strings. A malformed value (a bare `'de-DE'`, say) is dropped by the loader and the detector is registered as locale-agnostic, so a bad pack degrades rather than breaking the CLI.
+
+Declared locales show up in `prompt-scrub rules list`, alongside whether the active locale switches them on. `Default State` stays the detector's own default; `Locale State` is the separate question of whether the active locale lets it run:
+
+```bash
+$ prompt-scrub rules list --locale de-DE
+Active locale: de-DE
+Detector            Source                                              Default State   Locales   Locale State
+-----------------   -------------------------------------------------   -------------   -------   ------------
+SecretDetector      built-in                                            on              -         -
+...
+AddressDeDetector   rule-pack: @nanocollective/prompt-scrub-locale-de   on              de-DE     active
+```
+
+`rules list --locale` only previews: it resolves the table against the tag you pass without changing the configuration.
+
 ## Priority and Collision Resolution
 
 Your custom detectors participate in the same collision resolution process as built-in detectors. If your custom detector flags text that overlaps with another finding, the `prompt-scrubber` engine will resolve the conflict:
 
 - **Overlap**: The longer span wins.
 - **Priority**: Custom detectors resolve alongside the default fallback priority. Currently, there is no mechanism to enforce a custom detector overriding `SecretDetector`. If a secret overlaps with your custom finding, the `SecretDetector` will always win to prevent accidental secret leakage.
+- **Locale precedence**: A finding from a locale-scoped detector outranks the generic built-in of the same category, so a locale pack can replace an English-biased match rather than losing to it. It does not override higher-priority detectors such as `SecretDetector`, and it never wins when doing so would redact *less* text: if your finding sits strictly inside the built-in's span, the wider span is kept so nothing that was covered before is left in the clear.

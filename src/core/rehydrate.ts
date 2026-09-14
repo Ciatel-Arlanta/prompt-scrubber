@@ -1,7 +1,13 @@
 import { readSessionMap } from '../session/storage.js';
 import type { RehydrateRequest, RehydrateResult } from '../types/index.js';
 
-const PLACEHOLDER_REGEX = /«([A-Za-z]+_\d+)»/g;
+// Free-form, whitespace-excluding prefix, matching what scrub actually mints:
+// `placeholderPrefix` is a public extension point, so a rule pack using
+// `Ticket2` produces «Ticket2_1». Restricting to [A-Za-z]+ here left every
+// such placeholder unrehydratable — scrubbed away, then never restored.
+// Whitespace stays excluded so ordinary quoted text ending in `_<digits>`
+// (e.g. French/Russian guillemets) is never misread as a placeholder.
+const PLACEHOLDER_REGEX = /«([^«»\s]+_\d+)»/g;
 
 function rehydrateString(
   content: string,
@@ -36,6 +42,47 @@ function rehydrateString(
   }
 
   return { content: result, warnings };
+}
+
+/**
+ * Lightweight rehydrate that only returns the rewritten text and the number
+ * of placeholder occurrences replaced. Used by the streaming proxy to avoid
+ * pulling in the full `RehydrateResult` shape (with `warnings`) on every
+ * SSE chunk.
+ *
+ * Hallucinated placeholders are silently left in place; that's acceptable
+ * for the proxy because the upstream never echoes a placeholder it didn't
+ * see in its own request.
+ */
+export function rehydrateText(
+  content: string,
+  sessionMap: Record<string, string>,
+): { content: string; replaced: number } {
+  const foundTokens = new Set<string>();
+  const re = new RegExp(PLACEHOLDER_REGEX.source, 'g');
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(content)) !== null) {
+    foundTokens.add(match[1]!);
+  }
+
+  if (foundTokens.size === 0) {
+    return { content, replaced: 0 };
+  }
+
+  const sortedTokens = [...foundTokens].sort((a, b) => b.length - a.length);
+  let result = content;
+  let replaced = 0;
+  for (const token of sortedTokens) {
+    const fullToken = `«${token}»`;
+    const value = sessionMap[fullToken];
+    if (typeof value !== 'string') continue;
+    const countRe = new RegExp(PLACEHOLDER_REGEX.source, 'g');
+    while ((match = countRe.exec(result)) !== null) {
+      if (match[0] === fullToken) replaced += 1;
+    }
+    result = result.split(fullToken).join(value);
+  }
+  return { content: result, replaced };
 }
 
 /**

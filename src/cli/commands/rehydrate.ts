@@ -1,8 +1,9 @@
-import { readFileSync } from 'node:fs';
 import type { Command } from 'commander';
 import { resolveEncryptionKeyOrExit, runCliAction } from '../../core/cli-key-resolver.js';
 import { isSessionEncrypted } from '../../session/storage.js';
 import { rehydrate } from '../../core/rehydrate.js';
+import { readInput } from '../io.js';
+import { emitJson } from '../output.js';
 
 export function handleRehydrate(text: string, options: { sessionId: string }) {
   const result = rehydrate({
@@ -18,30 +19,20 @@ export function setupRehydrateCommand(program: Command) {
     .description('Rehydrate a file using stored session')
     .argument('[file]', 'File to rehydrate. If omitted, reads from stdin.')
     .requiredOption('--session-id <id>', 'Resume or target a specific session')
+    .option('--json', 'Output a structured JSON object instead of plain text')
     .action(async (file, options) => {
       await runCliAction(async () => {
-        let input = '';
-
-        if (file) {
-          try {
-            input = readFileSync(file, 'utf8');
-          } catch (err: unknown) {
-            console.error(`Error reading file: ${(err as Error).message}`);
-            process.exit(1);
-            return;
-          }
-        } else {
-          // Read from stdin
-          try {
-            input = readFileSync(0, 'utf-8');
-          } catch {
-            console.error('No input provided.');
-            process.exit(1);
-            return;
-          }
-        }
-
+        const input = readInput(file, options.json);
+        if (input === undefined) return;
         if (!input) {
+          if (options.json) {
+            const output = {
+              content: '',
+              sessionId: options.sessionId,
+              warnings: [],
+            };
+            emitJson(output);
+          }
           process.exit(0);
           return;
         }
@@ -51,6 +42,16 @@ export function setupRehydrateCommand(program: Command) {
         }
 
         const result = handleRehydrate(input, options);
+
+        if (options.json) {
+          const output = {
+            content: result.content,
+            sessionId: options.sessionId,
+            warnings: result.warnings ?? [],
+          };
+          emitJson(output);
+          return;
+        }
 
         // Print rehydrated content to stdout
         const outStr =

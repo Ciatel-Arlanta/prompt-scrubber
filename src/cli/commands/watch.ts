@@ -1,10 +1,14 @@
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { Command } from 'commander';
 import { resolveEncryptionKeyOrExit, runCliAction } from '../../core/cli-key-resolver.js';
 import { loadConfig } from '../../core/config.js';
+import { loadConfiguredRulePacks } from '../../core/rule-packs.js';
 import { isSessionEncrypted, sessionExists } from '../../session/storage.js';
-import { handleScrub } from './scrub.js';
+import { resolveLocale, warnIfLocaleUnused } from '../locale.js';
+import { parseConfidence } from '../options.js';
+import { formatSuppressionNotice, handleScrub, pluralize } from './scrub.js';
 
 /**
  * Every external process below is invoked through `spawnSync` with an argv
@@ -157,23 +161,18 @@ export function sendNotification(
   spawnSync('notify-send', ['--', title, message], { stdio: 'ignore' });
 }
 
-export function formatNotificationMessage(sessionMap?: Record<string, string>): string {
-  if (!sessionMap) return 'Scrubbed 0 items';
-  const keys = Object.keys(sessionMap);
-  if (keys.length === 0) return 'Scrubbed 0 items';
+/**
+ * Summarises what a single scrub replaced. Driven by this call's stats rather
+ * than the session map, which spans the whole run and would make every tick
+ * report the running total.
+ */
+export function formatNotificationMessage(byCategory?: Record<string, number>): string {
+  const entries = Object.entries(byCategory ?? {});
+  if (entries.length === 0) return 'Scrubbed 0 items';
 
-  const counts: Record<string, number> = {};
-  for (const key of keys) {
-    const cleanKey = key.replace(/[«»]/g, '');
-    const prefix = cleanKey.split('_')[0] || 'item';
-    const category = prefix.toLowerCase();
-    counts[category] = (counts[category] || 0) + 1;
-  }
-
-  const parts = Object.entries(counts).map(([cat, cnt]) => {
-    const name = cnt === 1 ? cat : `${cat}s`;
-    return `${cnt} ${name}`;
-  });
+  const parts = entries.map(
+    ([category, count]) => `${count} ${pluralize(category.toLowerCase(), count)}`,
+  );
 
   return `Scrubbed ${parts.join(', ')}`;
 }
@@ -185,6 +184,8 @@ interface WatchStepOptions {
   strictName?: boolean;
   codeTellTerms?: string;
   urlAllowlist?: string;
+  locale?: string;
+  minConfidence?: number;
   dryRun?: boolean;
   backup?: boolean;
   readClipboardFn?: () => string;
@@ -207,8 +208,14 @@ export async function watchClipboardStep(
     const result = await handleScrub(current, options);
     // Watch mode only handles string content
     const scrubbed = typeof result.scrubbedContent === 'string' ? result.scrubbedContent : current;
+    // Logged before the no-change return: when a threshold drops everything the
+    // clipboard is left untouched, which is exactly when silence is dangerous.
+    const notice = formatSuppressionNotice(result.stats, result.minConfidence);
+    if (notice) {
+      log(`[watch] ${notice} — left in the clipboard.`);
+    }
     if (scrubbed !== current) {
-      const msg = formatNotificationMessage(result.sessionMap);
+      const msg = formatNotificationMessage(result.stats.byCategory);
       if (options.dryRun) {
         log(`[watch] (dry-run) Would have ${msg.toLowerCase()} from clipboard.`);
         return current;
@@ -238,8 +245,14 @@ export async function watchFileStep(
     const result = await handleScrub(current, options);
     // Watch mode only handles string content
     const scrubbed = typeof result.scrubbedContent === 'string' ? result.scrubbedContent : current;
+    // Logged before the no-change return: when a threshold drops everything the
+    // file is left untouched, which is exactly when silence is dangerous.
+    const notice = formatSuppressionNotice(result.stats, result.minConfidence);
+    if (notice) {
+      log(`[watch] ${notice} — left in ${filePath}.`);
+    }
     if (scrubbed !== current) {
-      const msg = formatNotificationMessage(result.sessionMap);
+      const msg = formatNotificationMessage(result.stats.byCategory);
       if (options.dryRun) {
         log(`[watch] (dry-run) Would have ${msg.toLowerCase()} in ${filePath}.`);
         return current;
@@ -281,6 +294,14 @@ export async function handleWatch(
   const log = options.logFn ?? console.log;
   const intervalMs = Number.parseInt(options.interval || '1000', 10) || 1000;
 
+  // Resolved up front: a watch that only reports a bad locale once the first
+  // change lands would run for minutes looking like it was working.
+  const locale = resolveLocale(options.locale, loadConfig().locale);
+  if (locale) {
+    const { detectors } = await loadConfiguredRulePacks();
+    warnIfLocaleUnused(locale, detectors);
+  }
+
   // Only preflight the real clipboard path; injected mocks need no external tool.
   if (options.clipboard && !options.readClipboardFn) {
     assertClipboardSupport();
@@ -291,14 +312,23 @@ export async function handleWatch(
   // resolve the key up-front. Otherwise the first scrub tick can throw an
   // unhandled `SessionDecryptionError` deep inside `writeSessionMap`.
   const config = loadConfig();
-  const sessionId = typeof options.sessionId === 'string' ? options.sessionId : undefined;
   const willEncrypt =
     Boolean(config.encryptionEnabled) ||
-    (sessionId && sessionExists(sessionId) ? isSessionEncrypted(sessionId) : false);
+    (options.sessionId && sessionExists(options.sessionId)
+      ? isSessionEncrypted(options.sessionId)
+      : false);
   if (willEncrypt) {
     const resolve = options.resolveEncryptionKey ?? resolveEncryptionKeyOrExit;
     await resolve();
   }
+
+  // One session for the whole run. Without this each tick would mint a fresh
+  // session starting from an empty map, so the per-category counter would reset
+  // and a later tick would reissue «Email_1» for a different value - silently
+  // overwriting the first one in the file that is the only copy of it.
+  const sessionId = options.sessionId || randomUUID();
+  const stepOptions: WatchStepOptions = { ...options, sessionId };
+  log(`[watch] Session ID: ${sessionId}`);
 
   const readFn = options.readClipboardFn ?? readClipboard;
   let lastClip = options.clipboard ? readFn() : '';
@@ -313,10 +343,10 @@ export async function handleWatch(
 
   const tick = async () => {
     if (options.clipboard) {
-      lastClip = await watchClipboardStep(lastClip, options);
+      lastClip = await watchClipboardStep(lastClip, stepOptions);
     }
     for (const f of files) {
-      lastFileContents[f] = await watchFileStep(f, lastFileContents[f] ?? '', options);
+      lastFileContents[f] = await watchFileStep(f, lastFileContents[f] ?? '', stepOptions);
     }
   };
 
@@ -365,6 +395,15 @@ export function setupWatchCommand(program: Command) {
     .option('--strict-name', 'Enable strict allowlisting for NameDetector')
     .option('--code-tell-terms <terms>', 'Comma-separated list of private terms to detect')
     .option('--url-allowlist <hosts>', 'Comma-separated list of hostnames to pass-through')
+    .option(
+      '--locale <locale>',
+      'BCP-47 locale (e.g. de-DE) enabling detectors scoped to that locale',
+    )
+    .option(
+      '--min-confidence <value>',
+      'Discard findings scored below this confidence (0-1)',
+      parseConfidence,
+    )
     .action(async (options) => {
       await runCliAction(async () => {
         await handleWatch(options);
