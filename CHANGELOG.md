@@ -1,5 +1,11 @@
 # @nanocollective/prompt-scrub
 
+# 1.3.0
+
+- Add --json flag to scrub, inspect, and rehydrate CLI commands for machine-readable output in CI/CD pipelines and scripts. Also fixes inspect's placeholder numbering to match actual scrub output (right-to-left replacement with per-value deduplication); inspect text and JSON output now show the same placeholders scrub will produce.
+- Add locale-aware detector support: rule packs can declare a `locales` field (BCP-47) so a detector only runs when a matching locale is active, selected via a `locale` config key or a `--locale` flag on `scrub`, `inspect` and `watch` (flag overrides config; matching crosses subtag levels, so `de` serves `de-DE`). A locale-scoped finding takes precedence over the generic built-in of the same category, letting a locale pack replace an English-biased match, but never by covering less text than the finding it displaces, and higher-priority detectors such as `SecretDetector` still win. A malformed `--locale` exits non-zero; a well-formed locale that activates no detector warns on `stderr` instead of silently scrubbing English-only. `locales` from a third-party rule pack is validated at load and dropped when malformed. `rules list` gains `Locales`/`Locale State` columns and a `--locale` preview option. `getActiveDetectors` now also filters custom detectors that declare `locales` - previously the field was ignored and such a detector always ran. Closes #96.
+- feat: add `prompt-scrub proxy` — a local HTTP proxy that scrubs outgoing LLM requests (OpenAI `/v1/chat/completions`, Anthropic `/v1/messages`) and rehydrates responses, including streaming Server-Sent Events, transparently. Session continuity is maintained via an `x-prompt-scrub-session` request/response header.
+
 # 1.2.0
 
 - Add a `diff` command that prints a colorized original-vs-scrubbed view (`--side-by-side`, `--context`, `--no-color`) without writing a session.
