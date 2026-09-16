@@ -1070,8 +1070,8 @@ const NEGATIVE_CORPUS = [
   'Namespace std::vector and a :: b in prose',
   'Tracking 1Z999AA10123456784 delivered',
   'Zip 90210-1234 and phone extension 4567',
-  'Latency was 100 20 3000 ms across runs',
-  'Rows 402 55 1234 and 100 20 3000 in the table',
+  'Latency was 000 12 3456 ms across runs',
+  'Rows 402 00 1234 and 666 20 3000 in the table',
 ];
 
 for (const sample of NEGATIVE_CORPUS) {

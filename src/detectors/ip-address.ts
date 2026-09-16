@@ -47,6 +47,14 @@ const IPV6_REGEX = new RegExp(
   'g',
 );
 
+// A 4-part version is shaped exactly like an IPv4 address, so a match led by
+// a version keyword is skipped. v-prefixed forms never reach here: \b fails
+// between v and a digit.
+function isVersionContext(text: string, start: number): boolean {
+  const before = text.slice(Math.max(0, start - 24), start);
+  return /(?:\bv\b|version|release|build|bump\w*|assembly)[\s:]*$/i.test(before);
+}
+
 export class IpAddressDetector implements Detector {
   readonly name = 'IpAddressDetector';
 
@@ -73,6 +81,9 @@ export class IpAddressDetector implements Detector {
     while ((match = IPV4_REGEX.exec(text)) !== null) {
       const value = match[0];
       const start = match.index;
+      if (isVersionContext(text, start)) {
+        continue;
+      }
       // Skip if already covered by an IPv4-mapped IPv6 match
       const alreadyCovered = raw.some(
         (existing) => start >= existing.span[0] && start < existing.span[1],

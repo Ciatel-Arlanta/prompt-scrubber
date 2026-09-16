@@ -108,16 +108,22 @@ test('does not match out-of-bounds IPv4 octets (>255)', (t) => {
 });
 
 // A 4-component version like 1.2.3.4 is also a syntactically valid IPv4 address, so
-// it is deliberately still matched. Only the shapes below are distinguishable by regex:
-// 5+ segments, and a version prefixed with a letter.
+// it is still matched unless led by a version keyword. Only the shapes below are
+// distinguishable by regex: 5+ segments, and a version prefixed with a letter.
 test('does not match 5-segment versions or letter-prefixed versions', (t) => {
   const findings = detector.detect('Release version 1.2.3.4.5 and v2.0.0.1');
   t.is(findings.length, 0);
 });
 
-// A bare 4-component version is indistinguishable from an IPv4 address by shape, and
-// 1.2.3.4 really is a valid address. Pinned so the trade-off stays visible; it is also
-// called out in docs/features/detectors.md.
+test('does not match an IPv4-shaped version led by a version keyword', (t) => {
+  t.is(detector.detect('version 1.2.3.4 released').length, 0);
+  t.is(detector.detect('AssemblyVersion 1.0.0.1 shipped').length, 0);
+  t.is(detector.detect('build 2.10.3.1 passed').length, 0);
+});
+
+// A bare 4-component address without a version keyword is indistinguishable from
+// an IPv4 address by shape, and 1.2.3.4 really is a valid address. Pinned so the
+// trade-off stays visible; it is also called out in docs/features/detectors.md.
 test('a bare 4-component version is treated as an IPv4 address', (t) => {
   const findings = detector.detect('Upgrade from 1.2.3.4 to 2.0.0.0');
   t.is(findings.length, 2);

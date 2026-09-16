@@ -76,17 +76,29 @@ test('rejects bare 9-digit runs without an SSN label', (t) => {
   t.is(detector.detect('Invoice 987654321 is overdue').length, 0);
 });
 
-// The unlabelled pattern is hyphen-only. An unlabelled 3-2-4 run of space-separated
-// digits is overwhelmingly a table row or a measurement, and real SSNs are written with
-// hyphens, so the space form is only accepted alongside a label.
-test('unlabelled space-separated digit groups do not match', (t) => {
-  t.is(detector.detect('qty 100 20 3000 units').length, 0);
-  t.is(detector.detect('Latency was 100 20 3000 ms across runs').length, 0);
+// The unlabelled pattern accepts a consistent hyphen or space separator. A miss
+// is a breach, so a spaced SSN matches even without a label. SSA-invalid runs
+// still do not match.
+test('unlabelled space-separated SSN matches', (t) => {
+  const findings = detector.detect('Applicant John Doe 123 45 6789 lives here');
+  t.is(findings.length, 1);
+  t.is(findings[0]?.value, '123 45 6789');
+});
+
+test('unlabelled SSA-invalid space-separated groups do not match', (t) => {
+  t.is(detector.detect('qty 000 12 3456 units').length, 0);
+  t.is(detector.detect('code 666 12 3456 returned').length, 0);
 });
 
 test('unlabelled newline- or mixed-separated digit groups do not match', (t) => {
   t.is(detector.detect('123\n45\n6789').length, 0);
   t.is(detector.detect('123-45 6789').length, 0);
+});
+
+test('a labelled SSN matches with a distant label', (t) => {
+  const findings = detector.detect('SSN on file for the new hire 219456789 please');
+  t.is(findings.length, 1);
+  t.is(findings[0]?.value, '219456789');
 });
 
 test('a labelled space-separated SSN still matches', (t) => {

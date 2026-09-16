@@ -1,17 +1,16 @@
 import type { Detector, Finding } from '../types/index.js';
 
-// Both patterns share a group layout: 1 = the full SSN as written, 2/3/4 = area/group/serial.
+// Both patterns share a layout where group 1 is the full SSN as written.
 
-// Delimited 3-2-4 form. Hyphen-only, and deliberately so: accepting a space here also
-// accepts any 3-2-4 run of numbers, and `Latency was 100 20 3000 ms` is far more often
-// a table row or a measurement than an SSN. Real SSNs are written with hyphens.
-const SSN_DELIMITED = /(?<!\d)(([0-9]{3})-([0-9]{2})-([0-9]{4}))(?!\d)/g;
+// Delimited 3-2-4 form with a consistent separator: hyphen or space, not mixed
+// and not newline. A spaced SSN with no label still matches here, since a miss
+// is a breach while a false positive is reviewable noise.
+const SSN_DELIMITED = /(?<!\d)(([0-9]{3})([ -])([0-9]{2})\3([0-9]{4}))(?!\d)/g;
 
-// Separator-tolerant form, gated behind a nearby SSN label. The label carries the
-// evidence the shape alone cannot, so spaces and the continuous form are safe here.
-// The label is consumed by the match, so the finding is anchored on the digits alone.
+// Separator-tolerant form, gated behind an SSN label within a wider window.
+// The label carries the evidence the shape alone cannot.
 const SSN_CONTEXTUAL =
-  /(?:ssn|social security(?:\s+number)?|tax\s*id)\D{0,10}?(?<![\d-])(([0-9]{3})[ -]?([0-9]{2})[ -]?([0-9]{4}))(?!\d)/gi;
+  /(?:ssn|social security(?:\s+number)?|tax\s*id)\D{0,40}?(?<![\d-])(([0-9]{3})[ -]?([0-9]{2})[ -]?([0-9]{4}))(?!\d)/gi;
 
 /**
  * Validates whether the 3 components of an SSN satisfy Social Security Administration rules.
@@ -36,7 +35,10 @@ export class SsnDetector implements Detector {
       let match: RegExpExecArray | null;
 
       while ((match = regex.exec(text)) !== null) {
-        if (!isValidSsn(match[2] ?? '', match[3] ?? '', match[4] ?? '')) {
+        const area = match[2] ?? '';
+        const group = regex === SSN_DELIMITED ? (match[4] ?? '') : (match[3] ?? '');
+        const serial = regex === SSN_DELIMITED ? (match[5] ?? '') : (match[4] ?? '');
+        if (!isValidSsn(area, group, serial)) {
           continue;
         }
 

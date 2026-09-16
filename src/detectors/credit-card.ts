@@ -1,13 +1,16 @@
 import type { Detector, Finding } from '../types/index.js';
 
-// Regex patterns for candidate credit card numbers.
-// Boundaries reject adjacent alphanumerics so build IDs and hashes containing a
-// Luhn-valid digit run (e.g. 4532015000000007x) do not match.
+// Candidate card numbers. BIN ranges follow published issuer prefixes.
+// Luhn is the gate, so broader BINs are safe: a non-card run fails checksum.
 const CARD_PATTERNS: RegExp[] = [
-  // 16-digit cards (Visa, Mastercard, Discover): 4-4-4-4 format with spaces, hyphens, or continuous
-  /(?<![0-9A-Za-z])(?:4[0-9]{3}|5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720|6011|65[0-9]{2}|64[4-9][0-9])[\s-]?[0-9]{4}[\s-]?[0-9]{4}[\s-]?[0-9]{4}(?![0-9A-Za-z])/g,
+  // 16-digit cards with optional 19-digit tail: Visa, Mastercard 51-55 and
+  // 2221-2720, Discover, JCB 3528-3589, UnionPay 62/81, Maestro 50/56-69/6x,
+  // Diners 30/36/38/39 in 16-digit form. Separators are space or hyphen only.
+  /(?<![0-9A-Za-z])(?:4[0-9]{3}|5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720|6011|65[0-9]{2}|64[4-9][0-9]|35[2-8][0-9]|62[0-9]{2}|81[0-9]{2}|50[0-9]{2}|5[6-9][0-9]{2}|6[0-9]{3}|30[0-5][0-9]|36[0-9]{2}|38[0-9]{2}|39[0-9]{2})[ -]?[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}(?:[ -]?[0-9]{3})?(?![0-9A-Za-z])/g,
   // 15-digit American Express: 4-6-5 format with spaces, hyphens, or continuous
-  /(?<![0-9A-Za-z])(?:34|37)[0-9]{2}[\s-]?[0-9]{6}[\s-]?[0-9]{5}(?![0-9A-Za-z])/g,
+  /(?<![0-9A-Za-z])(?:34|37)[0-9]{2}[ -]?[0-9]{6}[ -]?[0-9]{5}(?![0-9A-Za-z])/g,
+  // 14-digit Diners Club: 4-6-4 format with spaces, hyphens, or continuous
+  /(?<![0-9A-Za-z])(?:30[0-5][0-9]|36[0-9]{2}|38[0-9]{2}|39[0-9]{2})[ -]?[0-9]{6}[ -]?[0-9]{4}(?![0-9A-Za-z])/g,
 ];
 
 /**

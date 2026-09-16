@@ -34,6 +34,19 @@ test('detects valid continuous digits (no delimiters)', (t) => {
   t.is(findings[0]?.value, '4532015000000007');
 });
 
+test('detects JCB, Diners, UnionPay and Maestro cards', (t) => {
+  t.is(detector.detect('JCB 3530111333300000 due')[0]?.value, '3530111333300000');
+  t.is(detector.detect('Diners 30569309025904 due')[0]?.value, '30569309025904');
+  t.is(detector.detect('UnionPay 8171999927660000 due')[0]?.value, '8171999927660000');
+  t.is(detector.detect('Maestro 6304000000000000 due')[0]?.value, '6304000000000000');
+});
+
+test('detects 19-digit Visa cards', (t) => {
+  const findings = detector.detect('Card 4532015112830366187 charged.');
+  t.is(findings.length, 1);
+  t.is(findings[0]?.value, '4532015112830366187');
+});
+
 // --- Span Accuracy ---
 
 test('span accurately reflects slice of text', (t) => {
