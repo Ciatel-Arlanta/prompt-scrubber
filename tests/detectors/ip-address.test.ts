@@ -59,6 +59,36 @@ test('detects compressed IPv6 with double colons in middle', (t) => {
 
 // --- Span & Offset Accuracy ---
 
+// The form nginx, Java's InetAddress, and Docker emit for dual-stack client IPs.
+// Without an IPv4-embedded branch, IPv6 matches `::ffff:192` and IPv4 separately matches
+// `192.0.2.1`; the overlap resolves to the longer span and leaks `.0.2.1` into the output.
+test('detects IPv4-mapped IPv6 as a single whole address', (t) => {
+  const findings = detector.detect('mapped ::ffff:192.0.2.1 here');
+  t.is(findings.length, 1);
+  t.is(findings[0]?.value, '::ffff:192.0.2.1');
+});
+
+test('detects the uncompressed and IPv4-compatible mapped forms', (t) => {
+  const full = detector.detect('client 0:0:0:0:0:ffff:192.0.2.1 connected');
+  t.is(full.length, 1);
+  t.is(full[0]?.value, '0:0:0:0:0:ffff:192.0.2.1');
+
+  const legacy = detector.detect('legacy ::192.0.2.1 form');
+  t.is(legacy.length, 1);
+  t.is(legacy[0]?.value, '::192.0.2.1');
+
+  const middle = detector.detect('mixed 2001:db8::192.0.2.1 form');
+  t.is(middle.length, 1);
+  t.is(middle[0]?.value, '2001:db8::192.0.2.1');
+});
+
+test('an IPv4-mapped IPv6 address leaves no fragment behind when scrubbed', (t) => {
+  const text = 'mapped ::ffff:192.0.2.1 here';
+  const findings = detector.detect(text);
+  const [start, end] = findings[0]!.span;
+  t.is(text.slice(0, start) + text.slice(end), 'mapped  here');
+});
+
 test('span accurately indexes text slice for IPv4 and IPv6', (t) => {
   const text = 'Primary: 192.168.1.1, Secondary: 2001:db8::1, End.';
   const findings = detector.detect(text);
@@ -77,9 +107,35 @@ test('does not match out-of-bounds IPv4 octets (>255)', (t) => {
   t.is(findings.length, 0);
 });
 
-test('does not match semantic version numbers', (t) => {
+// A 4-component version like 1.2.3.4 is also a syntactically valid IPv4 address, so
+// it is deliberately still matched. Only the shapes below are distinguishable by regex:
+// 5+ segments, and a version prefixed with a letter.
+test('does not match 5-segment versions or letter-prefixed versions', (t) => {
   const findings = detector.detect('Release version 1.2.3.4.5 and v2.0.0.1');
   t.is(findings.length, 0);
+});
+
+// A bare 4-component version is indistinguishable from an IPv4 address by shape, and
+// 1.2.3.4 really is a valid address. Pinned so the trade-off stays visible; it is also
+// called out in docs/features/detectors.md.
+test('a bare 4-component version is treated as an IPv4 address', (t) => {
+  const findings = detector.detect('Upgrade from 1.2.3.4 to 2.0.0.0');
+  t.is(findings.length, 2);
+  t.deepEqual(
+    findings.map((f) => f.value),
+    ['1.2.3.4', '2.0.0.0'],
+  );
+});
+
+test('absorbs a CIDR suffix instead of leaving a dangling mask', (t) => {
+  const findings = detector.detect('Subnet 192.168.1.0/24 routed');
+  t.is(findings.length, 1);
+  t.is(findings[0]?.value, '192.168.1.0/24');
+});
+
+test('does not match a bare double colon in prose', (t) => {
+  t.is(detector.detect('Compare a :: b in the spec').length, 0);
+  t.is(detector.detect('Use std::vector for this').length, 0);
 });
 
 test('does not match plain numbers or dates', (t) => {
